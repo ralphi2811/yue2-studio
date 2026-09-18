@@ -53,6 +53,10 @@ def test_pages_render(client):
     assert "Mes morceaux" in client.get("/").text
     r = client.get("/studio")
     assert r.status_code == 200 and 'id="job-form"' in r.text and "assistant-drawer" in r.text
+    # deux modes : les quatre panneaux existent, le mode initial est « Composer »
+    assert 'data-mode="compose"' in r.text and 'data-action="mode" data-mode="browse"' in r.text
+    for cls in ("panel-form", "panel-queue", "panel-detail", "panel-library"):
+        assert f'class="panel {cls}"' in r.text, cls
     assert client.get("/partials/settings").status_code == 200
     assert client.get("/partials/form?from_job=nope").status_code == 404
     assert client.get("/api/state").json()["model_state"] in {"unloaded", "loading", "ready", "error"}

@@ -62,6 +62,10 @@ et `YUE2_LLM_MODEL` sans les exporter dans le shell.
   Les réglages sont persistés dans `studio/data/settings.json`.
 - **File de jobs** : exécution séquentielle (le pipeline n'est pas concurrent), progression par étape en temps réel (SSE),
   annulation à chaud, préchargement / libération du modèle.
+- **Deux modes** (sélecteur en haut) : **Composer** affiche le formulaire, la file d'attente et la bibliothèque en liste ;
+  **Écouter** masque le formulaire, place la bibliothèque à gauche et la fiche du morceau en pleine largeur. Cliquer un morceau
+  passe en Écouter ; « Réutiliser », « Variation », « Éditer la partition » ou « Appliquer au formulaire » ramènent en Composer,
+  et le titre du formulaire indique l'origine des valeurs (« Nouvelle version de… », « Variation de… », etc.).
 - **Bibliothèque** : lecteur avec forme d'onde, téléchargement FLAC / WAV, partition rendue en portée + source ABC,
   requête, réglages effectifs (`config.json`), temps par étape, liste des fichiers.
 - **Outils de partition** (onglet Partition, et dans le détail d'un morceau) : validation stricte par le vérificateur du skill

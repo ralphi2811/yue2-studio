@@ -347,6 +347,15 @@
 
   function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
+  // ------------------------------------------------------------------ modes Composer / Écouter
+  function setMode(mode, persist = true) {
+    const layout = $("#layout");
+    if (!layout || (mode !== "compose" && mode !== "browse")) return;
+    layout.dataset.mode = mode;
+    $$(".mode-tab").forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
+    if (persist) { try { localStorage.setItem("yue2.mode", mode); } catch (_) {} }
+  }
+
   // ------------------------------------------------------------------ assistant LLM
   function setAssistantOpen(open) {
     const drawer = $("#assistant-drawer");
@@ -559,6 +568,7 @@
       case "rename": startRename(t); break;
       case "rename-cancel": cancelRename(t); break;
       case "toggle-assistant": setAssistantOpen($("#assistant-drawer").hidden); break;
+      case "mode": setMode(t.dataset.mode); break;
       case "detach-project": {
         const f = $("#job-form");
         $('[name="project_id"]', f).value = "";
@@ -659,11 +669,11 @@
   document.addEventListener("htmx:afterSwap", ev => {
     const target = (ev.detail && ev.detail.target) || ev.target;
     if (!target || !target.id) return;
-    if (target.id === "form-panel") { initForm(target); target.scrollIntoView({ behavior: "smooth", block: "start" }); }
+    if (target.id === "form-panel") { setMode("compose"); initForm(target); target.scrollIntoView({ behavior: "smooth", block: "start" }); }
     if (target.id === "detail") {
       initPlayer(target); renderAbcBlocks(target);
       const id = $(".detail", target)?.dataset.job;
-      if (id) { $$(".track").forEach(x => x.classList.toggle("selected", x.dataset.job === id)); }
+      if (id) { setMode("browse"); $$(".track").forEach(x => x.classList.toggle("selected", x.dataset.job === id)); }
       if (!$(".detail", target)) target.innerHTML = '<p>Sélectionnez un morceau dans la bibliothèque.</p>';
       target.classList.toggle("detail-empty", !$(".detail", target));
     }
@@ -672,6 +682,7 @@
       if (live) live.scrollTop = live.scrollHeight;
     }
     if (target.id === "library") {
+      const count = $('[data-role="library-count"]'); if (count) count.textContent = $$(".track", target).length;
       const id = $(".detail")?.dataset.job;
       if (id) $$(".track", target).forEach(x => x.classList.toggle("selected", x.dataset.job === id));
     }
@@ -709,6 +720,7 @@
     applyGlobalHelp();
     initForm(document);
     try { if (localStorage.getItem("yue2.assistant") === "1") setAssistantOpen(true); } catch (_) {}
+    try { const saved = localStorage.getItem("yue2.mode"); if (saved && !location.hash) setMode(saved, false); } catch (_) {}
     abInit(document);
     const pm = /#project=([A-Za-z0-9_.-]+)/.exec(location.hash);
     if (pm && $("#assistant-body") && window.htmx) {

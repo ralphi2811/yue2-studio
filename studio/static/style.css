@@ -79,18 +79,31 @@ code { font-family: var(--mono); font-size: 12px; background: var(--bg-elev-2); 
 
 /* ---------- disposition ---------- */
 .layout {
-  display: grid; grid-template-columns: minmax(0, 620px) minmax(0, 1fr); grid-template-rows: auto auto;
+  display: grid; grid-template-rows: auto 1fr; align-items: start;
   gap: 16px; padding: 16px 20px 40px; max-width: 1700px; margin: 0 auto;
 }
 .panel { background: var(--bg-elev); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; min-width: 0; }
-.panel-form { grid-row: 1 / span 2; }
-.panel-queue { display: flex; flex-direction: column; gap: 18px; }
-.panel-library { min-height: 200px; }
+.panel-form { grid-area: form; }
+.panel-queue { grid-area: queue; }
+.panel-detail { grid-area: detail; }
+.panel-library { grid-area: library; min-height: 200px; }
+/* Composer : formulaire à gauche, file d'attente et bibliothèque compacte à droite. */
+.layout[data-mode="compose"] { grid-template-columns: minmax(0, 620px) minmax(0, 1fr); grid-template-areas: "form queue" "form library"; }
+.layout[data-mode="compose"] .panel-detail { display: none; }
+/* Écouter : bibliothèque à gauche, fiche du morceau en grand à droite ; la file n'apparaît que si elle travaille. */
+.layout[data-mode="browse"] { grid-template-columns: minmax(0, 380px) minmax(0, 1fr); grid-template-areas: "library queue" "library detail"; }
+.layout[data-mode="browse"] .panel-form { display: none; }
+.layout[data-mode="browse"] .panel-queue:has(.queue .empty) { display: none; }
+.layout[data-mode="browse"] .panel-library { position: sticky; top: 64px; max-height: calc(100vh - 84px); overflow: auto; }
+.mode-tabs { margin-left: 0; }
+.mode-tab { background: transparent; border: 0; color: var(--fg-muted); padding: 5px 12px; border-radius: 6px; font: inherit; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.mode-tab.active { background: var(--bg-elev-2); color: var(--fg); font-weight: 600; }
+.mode-tab .count { font-size: 11px; color: var(--fg-faint); font-weight: 500; }
 .panel-head { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; flex-wrap: wrap; }
 .panel-head .search { margin-left: auto; }
 @media (max-width: 1100px) {
-  .layout { grid-template-columns: 1fr; padding: 12px 16px 32px; }
-  .panel-form { grid-row: auto; }
+  .layout, .layout[data-mode="compose"], .layout[data-mode="browse"] { grid-template-columns: 1fr; grid-template-areas: "queue" "form" "detail" "library"; padding: 12px 16px 32px; }
+  .layout[data-mode="browse"] .panel-library { position: static; max-height: none; }
   .topbar { padding: 10px 16px; gap: 12px; }
   .brand .sub { display: none; }
 }
@@ -241,7 +254,6 @@ select.inline { width: auto; padding: 4px 8px; font-size: 12px; }
 .detail-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
 .eyebrow .muted { font-weight: 500; letter-spacing: 0; text-transform: none; }
-.panel-queue:has(#detail .detail) .queue .empty { display: none; }
 .form-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .detail-head h2 { font-size: 17px; }

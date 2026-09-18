@@ -2,13 +2,17 @@
 {% set page = "studio" %}
 {% block title %}YuE2 Studio · atelier{% endblock %}
 {% block topbar_actions %}
+    <nav class="tabs mode-tabs" aria-label="Mode du studio">
+      <button type="button" class="mode-tab active" data-action="mode" data-mode="compose" title="Formulaire, assistant et file d'attente">✎ Composer</button>
+      <button type="button" class="mode-tab" data-action="mode" data-mode="browse" title="Bibliothèque et fiche du morceau en pleine largeur">♪ Écouter <span class="count" data-role="library-count">{{ history|length }}</span></button>
+    </nav>
     <label class="toggle-help" title="Afficher toutes les explications sous les champs">
       <input type="checkbox" id="toggle-help"> <span>Explications</span>
     </label>
     <button class="btn" data-action="toggle-assistant" title="Assistant de composition (LLM)">✨ Assistant</button>
 {% endblock %}
 {% block body %}
-<main class="layout">
+<main class="layout" id="layout" data-mode="compose">
   <section class="panel panel-form" id="form-panel">
     {% include "partials/form.html" %}
   </section>
@@ -17,6 +21,9 @@
     <div id="queue" sse-swap="queue" hx-get="/partials/queue" hx-trigger="queue-changed from:body">
       {% include "partials/queue.html" %}
     </div>
+  </section>
+
+  <section class="panel panel-detail">
     <div id="detail" class="detail-empty">
       <p>Sélectionnez un morceau dans la bibliothèque pour l'écouter, lire sa partition et ses réglages.</p>
     </div>
