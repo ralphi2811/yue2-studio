@@ -1031,6 +1031,8 @@ async def project_from_job(request: Request, job_id: str, target: str = "drawer"
         job.persist()
     if target == "page":
         return Response(status_code=204, headers={"HX-Redirect": f"/projects/{project.id}"})
+    if target == "composer":
+        return Response(status_code=204, headers={"HX-Redirect": f"/studio#project={project.id}"})
     return HTMLResponse(_assistant_html(request, project), headers={"HX-Trigger": json.dumps({"assistant-open": True, "library-changed": True})})
 
 

@@ -58,9 +58,9 @@
     {% endif %}
     {% if project %}
     <a class="btn ghost" href="/projects/{{ project.id }}" title="Frise des versions du projet">✨ Projet « {{ project.name }} » · v{{ project_version.number }}</a>
-    <button class="btn ghost" hx-post="/projects/from-job/{{ job.id }}" hx-target="#assistant-body" hx-swap="innerHTML" title="Ouvrir la conversation du projet dans le tiroir">💬 Assistant</button>
+    <a class="btn ghost" href="/studio#project={{ project.id }}" title="Reprendre la conversation de ce projet dans Composer (l'assistant n'existe que là-bas)">💬 Reprendre dans Composer</a>
     {% elif job.status == "done" and job.kind == "song" %}
-    <button class="btn ghost" hx-post="/projects/from-job/{{ job.id }}" hx-target="#assistant-body" hx-swap="innerHTML" title="Crée un projet dont ce morceau est la v1 et ouvre l'assistant pour le retravailler">✨ Retravailler avec l'assistant</button>
+    <button class="btn ghost" hx-post="/projects/from-job/{{ job.id }}?target=composer" title="Crée un projet dont ce morceau est la v1 et ouvre Composer avec l'assistant sur cette conversation">✨ Retravailler avec l'assistant</button>
     {% endif %}
     {% if job.status != "running" %}
     <button class="btn danger ghost right" hx-delete="/jobs/{{ job.id }}" hx-target="#detail" hx-swap="innerHTML" hx-confirm="Supprimer définitivement « {{ job.name }} » et tous ses fichiers ?">🗑 Supprimer</button>

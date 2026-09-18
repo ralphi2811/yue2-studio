@@ -41,7 +41,9 @@ et `YUE2_LLM_MODEL` sans les exporter dans le shell.
   Réglages dans ⚙︎ Moteur → Assistant LLM, ou par variables d'environnement `YUE2_LLM_API_KEY`, `YUE2_LLM_BASE_URL` et
   `YUE2_LLM_MODEL` (prioritaires : le champ correspondant est alors verrouillé dans l'interface) ; sinon les valeurs saisies
   vont dans `studio/data/assistant.json` (hors git, permissions 600). Bouton « Enregistrer et tester » qui interroge `/models`
-  et fait un mini appel.
+  et fait un mini appel. `max_tokens` vaut 8000 par défaut : une proposition complète (paroles + justifications) est longue, et
+  un modèle qui raisonne consomme des jetons avant d'écrire. Une réponse coupée est relancée une fois avec un budget relevé,
+  puis l'erreur dit quoi régler au lieu d'un « JSON incomplet ».
 - **Projets et versions** : chaque conversation avec l'assistant est un projet persistant (`outputs/studio/projects/<id>/project.json`).
   Toute génération lancée depuis un projet devient une version (v1, v2…) qui référence le job sans le déplacer : audio, partition et
   réglages sont conservés. Page projet (`/projects/<id>`) : frise des versions avec lecteur, origine (proposition de l'assistant,
@@ -70,8 +72,9 @@ et `YUE2_LLM_MODEL` sans les exporter dans le shell.
   Composer liste les derniers morceaux terminés : le ▶ lance la lecture sur place (barre de lecture commune à toutes les
   pages, ⏮/⏭ entre les morceaux visibles), le nom ouvre la fiche. En fin de génération, le morceau qui vient d'apparaître
   est chargé tout seul dans la barre, en pause : il ne reste qu'à appuyer sur lecture (jamais pendant une autre écoute).
-  L'assistant suit le morceau ouvert : il affiche la conversation de son projet, ou propose d'en faire la v1 d'un projet s'il
-  n'en a pas ; depuis une fiche, sa proposition s'ouvre dans Composer (`/studio?apply=<projet>`).
+  L'assistant n'existe que dans Composer : la page Morceaux n'a ni tiroir ni bouton ✨. Depuis la fiche d'un morceau,
+  « Reprendre dans Composer » ouvre `/studio#project=<projet>` sur sa conversation, et « Retravailler avec l'assistant »
+  crée d'abord le projet (v1 = ce morceau) avant d'y rediriger.
   **Appliquer et générer** (case cochée par défaut dans le composeur de l'assistant, sur la page Composer) : chaque nouvelle
   proposition remplit le formulaire (swap « hors bande ») et part en file sans confirmation. Une modification faite à la main
   dans le formulaire suspend l'automatisme pour ce tour, et une proposition refusée par la validation remplit quand même le

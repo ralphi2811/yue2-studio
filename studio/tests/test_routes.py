@@ -119,8 +119,9 @@ def test_track_page_lives_under_morceaux(client, engine, fake_runner, make_job, 
     # le morceau ouvert est marqué dans la liste ; les autres pistes ont un lien profond
     assert f'class="track st-done selected" data-job="{job.id}"' in text
     assert f'hx-push-url="/morceaux/{other.id}"' in text
-    # l'assistant se charge sur ce morceau
-    assert f'/assistant/panel?job_id={job.id}' in text
+    # l'assistant n'existe que dans Composer : ni tiroir ni bouton ici, seulement des passages vers Composer
+    assert "assistant-drawer" not in text and "toggle-assistant" not in text and "/assistant/panel" not in text
+    assert "/studio?from_job=" in text
     # la galerie et le lecteur global pointent vers cette page, plus vers « /studio#job= »
     gallery = client.get("/").text
     assert f'href="/morceaux/{job.id}"' in gallery and "#job=" not in gallery

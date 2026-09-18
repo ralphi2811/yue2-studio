@@ -63,6 +63,44 @@ def test_llm_settings_ready_from_env_alone(monkeypatch):
 
 
 @pytest.mark.anyio
+async def test_chat_retries_once_when_cut_by_max_tokens(monkeypatch):
+    """Une réponse coupée (paroles longues, modèle qui raisonne) est relancée une fois avec plus de budget,
+    au lieu de remonter un « JSON incomplet » incompréhensible."""
+    import httpx
+    budgets = []
+
+    async def post(self, url, headers=None, json=None):
+        budgets.append(json["max_tokens"])
+        if len(budgets) == 1:
+            return httpx.Response(200, json={"choices": [{"finish_reason": "length", "message": {"content": '{"type": "prop'}}],
+                                             "usage": {"prompt_tokens": 100, "completion_tokens": 900}})
+        return httpx.Response(200, json={"choices": [{"finish_reason": "stop", "message": {"content": '{"ok": true}'}}],
+                                         "usage": {"prompt_tokens": 100, "completion_tokens": 50}})
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", post)
+    s = llm.LLMSettings(base_url="http://h/v1", model="m", max_tokens=2000)
+    content, usage = await llm.chat([{"role": "user", "content": "x"}], s=s)
+    assert content == '{"ok": true}' and budgets == [2000, 8000]
+    assert usage == {"prompt_tokens": 200, "completion_tokens": 950}     # les deux appels sont comptés
+
+
+@pytest.mark.anyio
+async def test_chat_says_what_to_change_when_truncation_persists(monkeypatch):
+    import httpx
+    calls = []
+
+    async def post(self, url, headers=None, json=None):
+        calls.append(json["max_tokens"])
+        return httpx.Response(200, json={"choices": [{"finish_reason": "length", "message": {"content": "{"}}], "usage": {}})
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", post)
+    s = llm.LLMSettings(base_url="http://h/v1", model="m", max_tokens=8000)
+    with pytest.raises(llm.LLMError, match="max_tokens"):
+        await llm.chat([{"role": "user", "content": "x"}], s=s)
+    assert calls == [8000, llm.MAX_TOKENS_CEILING]      # un seul nouvel essai, puis on explique
+
+
+@pytest.mark.anyio
 async def test_chat_uses_env_base_url_and_model(monkeypatch):
     import httpx
     seen = {}

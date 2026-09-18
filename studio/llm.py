@@ -42,7 +42,7 @@ class LLMSettings:
     model: str = ""
     api_key: str = ""
     temperature: float = 0.8
-    max_tokens: int = 4000
+    max_tokens: int = 8000    # une proposition complète (paroles + justifications) tient rarement en moins
     timeout: float = 120.0
 
     @property
@@ -169,15 +169,13 @@ def extract_json(text: str) -> dict:
     raise LLMError("JSON incomplet dans la réponse")
 
 
-async def chat(messages: list[dict], *, json_mode: bool = True, s: LLMSettings | None = None,
-               temperature: float | None = None, max_tokens: int | None = None) -> tuple[str, dict]:
-    """Appelle /chat/completions. Retourne (texte, usage). Repli automatique si json_object est refusé."""
-    s = s or get_settings()
-    if not s.ready:
-        raise LLMError("Assistant non configuré : renseignez l'URL et le modèle dans ⚙︎ Moteur → Assistant LLM.")
+MAX_TOKENS_CEILING = 24000
+
+
+async def _post(s: LLMSettings, messages: list[dict], json_mode: bool, temperature: float | None, budget: int) -> dict:
     payload = {"model": s.effective_model, "messages": messages,
                "temperature": s.temperature if temperature is None else temperature,
-               "max_tokens": s.max_tokens if max_tokens is None else max_tokens}
+               "max_tokens": budget}
     if json_mode:
         payload["response_format"] = {"type": "json_object"}
     url = s.effective_base_url + "/chat/completions"
@@ -193,14 +191,58 @@ async def chat(messages: list[dict], *, json_mode: bool = True, s: LLMSettings |
         except Exception:
             pass
         raise LLMError(f"HTTP {r.status_code} : {detail}")
-    data = r.json()
+    return r.json()
+
+
+def _content(data: dict) -> str:
     try:
-        choice = data["choices"][0]
-        content = choice["message"].get("content") or ""
-        if isinstance(content, list):   # certains fournisseurs renvoient des blocs
-            content = "".join(part.get("text", "") for part in content if isinstance(part, dict))
+        content = data["choices"][0]["message"].get("content") or ""
     except (KeyError, IndexError, TypeError) as exc:
         raise LLMError(f"Réponse inattendue du fournisseur : {str(data)[:300]}") from exc
-    if not content.strip():
-        raise LLMError("Réponse vide du modèle (max_tokens trop bas ou modèle de raisonnement sans sortie ?)")
-    return content, data.get("usage") or {}
+    if isinstance(content, list):   # certains fournisseurs renvoient des blocs
+        content = "".join(part.get("text", "") for part in content if isinstance(part, dict))
+    return content
+
+
+def _truncated(data: dict) -> bool:
+    """Le modèle a-t-il été coupé par max_tokens ? (``length`` chez OpenAI, ``MAX_TOKENS`` chez d'autres)"""
+    try:
+        choice = data["choices"][0]
+    except (KeyError, IndexError, TypeError):
+        return False
+    reason = (choice.get("finish_reason") or choice.get("native_finish_reason") or "")
+    return str(reason).lower() in {"length", "max_tokens"}
+
+
+def _add_usage(total: dict, more: dict) -> dict:
+    for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
+        if more.get(key):
+            total[key] = total.get(key, 0) + int(more[key])
+    return total
+
+
+async def chat(messages: list[dict], *, json_mode: bool = True, s: LLMSettings | None = None,
+               temperature: float | None = None, max_tokens: int | None = None) -> tuple[str, dict]:
+    """Appelle /chat/completions. Retourne (texte, usage cumulé). Repli automatique si json_object est refusé.
+
+    Une réponse coupée par ``max_tokens`` (paroles longues, modèle qui raisonne avant d'écrire) est relancée
+    UNE fois avec le double du budget, plafonné. Sinon l'erreur dit quoi régler plutôt que « JSON incomplet ».
+    """
+    s = s or get_settings()
+    if not s.ready:
+        raise LLMError("Assistant non configuré : renseignez l'URL et le modèle dans ⚙︎ Moteur → Assistant LLM.")
+    budget = int(s.max_tokens if max_tokens is None else max_tokens)
+    usage: dict = {}
+    for attempt in (1, 2):      # un seul nouvel essai : chaque appel coûte des jetons
+        data = await _post(s, messages, json_mode, temperature, budget)
+        _add_usage(usage, data.get("usage") or {})
+        content = _content(data)
+        if not _truncated(data):
+            if not content.strip():
+                raise LLMError("Réponse vide du modèle (modèle de raisonnement sans sortie, ou filtre du fournisseur ?)")
+            return content, usage
+        if attempt == 2 or budget >= MAX_TOKENS_CEILING:
+            raise LLMError(f"Réponse coupée à {budget} jetons de sortie. Augmentez « max_tokens » dans "
+                           f"⚙︎ Moteur → Assistant LLM, ou demandez un morceau plus court.")
+        budget = min(max(budget * 4, 8000), MAX_TOKENS_CEILING)
+    raise LLMError("Réponse coupée par le fournisseur.")   # inatteignable
