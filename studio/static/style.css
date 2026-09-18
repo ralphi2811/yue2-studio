@@ -241,6 +241,9 @@ select.inline { width: auto; padding: 4px 8px; font-size: 12px; }
 .detail-head h2 { font-size: 17px; }
 .player { background: var(--bg-input); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 12px; }
 .player-controls { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.player-controls .btn.round { flex: 0 0 40px; }
+.player-controls .right { flex-wrap: wrap; justify-content: flex-end; }
+.player-controls .time { white-space: nowrap; }
 .player .time { color: var(--fg-muted); }
 .waveform { min-height: 72px; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
