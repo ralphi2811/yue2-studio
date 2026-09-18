@@ -31,15 +31,8 @@
       {% if job.summary.vae and job.summary.vae != "standard" %} · <span>VAE {{ job.summary.vae }}</span>{% endif %}
     </div>
     <div class="card-actions">
-      {% if project %}
-      <a class="btn ghost small" href="/projects/{{ project.id }}" title="Frise des versions et conversation">Versions</a>
-      <a class="btn ghost small" href="/studio#project={{ project.id }}" title="Continuer avec l'assistant">✨</a>
-      {% else %}
-      <a class="btn ghost small" href="/morceaux/{{ job.id }}">Ouvrir</a>
-      {% if has_audio %}<button class="btn ghost small" hx-post="/projects/from-job/{{ job.id }}?target=page" title="Retravailler avec l'assistant : crée un projet dont ce morceau est la v1">✨</button>{% endif %}
-      {% endif %}
+      <a class="btn ghost small" href="/morceaux/{{ job.id }}" title="{% if project %}Dernière version : lecteur, partition, réglages, frise du projet et assistant{% else %}Lecteur, partition, réglages et assistant{% endif %}">Ouvrir</a>
       {% if has_audio %}<a class="btn ghost small" href="/jobs/{{ job.id }}/file/audio.flac" download title="Télécharger l'audio (FLAC)">⬇</a>{% endif %}
-      {% if job.summary.has_score %}<a class="btn ghost small" href="/jobs/{{ job.id }}/file/score.abc" download title="Partition ABC">♩</a>{% endif %}
       {% if project %}<button class="btn ghost small danger right" hx-delete="/projects/{{ project.id }}?with_jobs=1&card=1" hx-target="closest .card" hx-swap="outerHTML swap:200ms" hx-confirm="Supprimer le projet « {{ project.name }} », sa conversation et ses {{ version_count }} version{{ 's' if version_count > 1 else '' }} audio ? Cette action est définitive." title="Supprimer le projet et ses versions">🗑</button>
       {% else %}<button class="btn ghost small danger right" hx-delete="/jobs/{{ job.id }}" hx-target="closest .card" hx-swap="outerHTML swap:200ms" hx-confirm="Supprimer définitivement « {{ job.name }} » et tous ses fichiers ?" title="Supprimer">🗑</button>{% endif %}
     </div>

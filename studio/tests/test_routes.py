@@ -123,6 +123,13 @@ def test_track_page_lives_under_morceaux(client, engine, fake_runner, make_job, 
     # la galerie et le lecteur global pointent vers cette page, plus vers « /studio#job= »
     gallery = client.get("/").text
     assert f'href="/morceaux/{job.id}"' in gallery and "#job=" not in gallery
+    # cartes de la galerie : les mêmes actions partout (Ouvrir, audio, supprimer), qu'il s'agisse d'un projet ou non
+    project = store.create("proj_carte"); store.add_version(project, job.id)
+    gallery = client.get("/").text
+    cards = gallery.count('<article class="card ')
+    assert cards >= 2 and gallery.count('">Ouvrir</a>') == cards + 1     # un « Ouvrir » par carte (le moteur est partagé entre tests), plus celui du lecteur global
+    assert "Versions" not in gallery and "score.abc" not in gallery
+    assert "/projects/from-job/" not in gallery and f'hx-delete="/projects/{project.id}?with_jobs=1&card=1"' in gallery
     # « Derniers terminés » de la file d'attente mène à la fiche
     assert f'href="/morceaux/{job.id}"' in client.get("/partials/queue").text
 
