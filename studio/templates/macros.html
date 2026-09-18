@@ -1,0 +1,44 @@
+{# Rendu d'un champ depuis le catalogue params.py #}
+{% macro field(p, values, extra_class="") -%}
+{% set v = values.get(p.key) %}
+{% set v = p.default if v is none and not p.nullable and p.kind not in ("text", "textarea") else v %}
+<div class="field {{ extra_class }} {% if p.advanced %}field-advanced{% endif %}" data-key="{{ p.key }}">
+  <div class="field-head">
+    <label for="f-{{ p.key|replace('.', '-') }}">{{ p.label }}</label>
+    <span class="field-meta">
+      {% if p.kind in ("int", "float") and p.default is not none %}<span class="default" title="Valeur par défaut du runtime">déf. {{ p.default }}</span>{% endif %}
+      {% if p.help %}<button type="button" class="help-toggle" aria-label="Explication" title="Explication">?</button>{% endif %}
+    </span>
+  </div>
+  {% if p.kind == "textarea" %}
+    <textarea id="f-{{ p.key|replace('.', '-') }}" name="{{ p.key }}" rows="{{ p.rows }}" placeholder="{{ p.placeholder }}" spellcheck="false">{{ v or "" }}</textarea>
+  {% elif p.kind == "select" %}
+    <select id="f-{{ p.key|replace('.', '-') }}" name="{{ p.key }}">
+      {% for val, label in p.choices %}<option value="{{ val }}" {% if (v|string) == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  {% elif p.kind == "bool" %}
+    <label class="switch"><input type="checkbox" id="f-{{ p.key|replace('.', '-') }}" name="{{ p.key }}" value="1" {% if v %}checked{% endif %}><span class="track"></span><span class="switch-label">{{ "activé" if v else "désactivé" }}</span></label>
+  {% elif p.kind in ("int", "float") %}
+    <div class="num-row">
+      <input type="number" id="f-{{ p.key|replace('.', '-') }}" name="{{ p.key }}" value="{{ '' if v is none else v }}"
+             {% if p.min is not none %}min="{{ p.min }}"{% endif %} {% if p.max is not none %}max="{{ p.max }}"{% endif %}
+             {% if p.step is not none %}step="{{ p.step }}"{% endif %} placeholder="{{ p.placeholder }}" inputmode="decimal">
+      {% if p.min is not none and p.max is not none and p.max - p.min <= 200 %}
+      <input type="range" class="slider" data-for="f-{{ p.key|replace('.', '-') }}" min="{{ p.min }}" max="{{ p.max }}" step="{{ p.step or 1 }}" value="{{ p.default if v is none else v }}" aria-hidden="true" tabindex="-1">
+      {% endif %}
+      {% if p.key == "seed" %}<button type="button" class="btn ghost small" data-action="random-seed" title="Graine aléatoire">🎲</button>{% endif %}
+    </div>
+  {% else %}
+    <input type="text" id="f-{{ p.key|replace('.', '-') }}" name="{{ p.key }}" value="{{ v or '' }}" placeholder="{{ p.placeholder }}" autocomplete="off">
+  {% endif %}
+  {% if p.help %}<p class="help">{{ p.help }}</p>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro status_pill(job) -%}
+<span class="pill st-{{ job.status }}">{{ {"queued": "en file", "running": "en cours", "done": "terminé", "failed": "échec", "cancelled": "annulé"}[job.status] }}</span>
+{%- endmacro %}
+
+{% macro kind_label(job) -%}
+{{ {"song": "Chanson", "plan": "Partition seule", "decode": "Re-décodage"}[job.kind] }}
+{%- endmacro %}

@@ -1,0 +1,23 @@
+<div class="diff">
+  <div class="diff-head"><strong>v{{ a.number }} → v{{ b.number }}</strong> <span class="muted small">· {{ summary }}</span></div>
+  {% if changes.empty %}
+  <p class="muted small">Requête identique : la différence vient d'une autre graine ou du hasard de l'échantillonnage.</p>
+  {% endif %}
+  {% if changes.style %}
+  <h4>Style</h4>
+  <div class="diff-pair"><div class="del">{{ changes.style.before }}</div><div class="add">{{ changes.style.after }}</div></div>
+  {% endif %}
+  {% if changes.lyrics %}
+  <h4>Paroles <span class="muted">(+{{ changes.lyrics_stats.added }} / -{{ changes.lyrics_stats.removed }} lignes)</span></h4>
+  <pre class="diff-lines">{% for chunk in changes.lyrics %}{% if chunk.op == "equal" %}{% for l in chunk.a %}<span class="eq">  {{ l }}</span>
+{% endfor %}{% else %}{% for l in chunk.a %}<span class="del">- {{ l }}</span>
+{% endfor %}{% for l in chunk.b %}<span class="add">+ {{ l }}</span>
+{% endfor %}{% endif %}{% endfor %}</pre>
+  {% endif %}
+  {% if changes.settings %}
+  <h4>Réglages</h4>
+  <table class="kv compact">
+    {% for key, ch in changes.settings.items() %}<tr><th>{{ key }}</th><td><span class="del">{{ ch.before if ch.before is not none else "défaut" }}</span> → <span class="add">{{ ch.after if ch.after is not none else "défaut" }}</span></td></tr>{% endfor %}
+  </table>
+  {% endif %}
+</div>

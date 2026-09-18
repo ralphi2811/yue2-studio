@@ -1,0 +1,43 @@
+{% import "macros.html" as m %}
+<form hx-post="/settings" hx-target="#settings" hx-swap="innerHTML" class="settings-form">
+  <div class="panel-head">
+    <h2>Moteur d'inférence</h2>
+    <button type="button" class="btn ghost small" data-action="close-settings">✕ Fermer</button>
+  </div>
+  <p class="muted">Ces réglages définissent comment le pipeline est chargé sur le GPU. Un changement nécessite un rechargement (quelques secondes, plus le téléchargement éventuel). Les jobs déjà en file utiliseront les nouveaux réglages s'ils démarrent après le rechargement.</p>
+
+  {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+  {% if flash %}<div class="alert ok">{{ flash }}</div>{% endif %}
+  {% if model_state == "error" %}<div class="alert error">Dernier chargement en erreur : <code>{{ model_error }}</code></div>{% endif %}
+  {% if settings_dirty %}<div class="alert info">Le pipeline chargé utilise d'anciens réglages. Cliquez sur « Enregistrer et recharger » pour appliquer.</div>{% endif %}
+
+  <fieldset class="group">
+    <legend>Modèles</legend>
+    {% for p in P.ENGINE if p.key in ("model", "vae", "vae_custom") %}{{ m.field(p, values) }}{% endfor %}
+    <div class="grid-2">{% for p in P.ENGINE if p.key in ("revision", "vae_revision") %}{{ m.field(p, values) }}{% endfor %}</div>
+    <div class="grid-2">{% for p in P.ENGINE if p.key in ("offline", "verify_hashes") %}{{ m.field(p, values) }}{% endfor %}</div>
+  </fieldset>
+
+  <fieldset class="group">
+    <legend>Mémoire et vitesse</legend>
+    <div class="grid-2">{% for p in P.ENGINE if p.key in ("device", "budget") %}{{ m.field(p, values) }}{% endfor %}</div>
+    <div class="grid-2">{% for p in P.ENGINE if p.key in ("backend", "quantization") %}{{ m.field(p, values) }}{% endfor %}</div>
+    <div class="grid-2">{% for p in P.ENGINE if p.key in ("offload_ar", "vae_core_frames") %}{{ m.field(p, values) }}{% endfor %}</div>
+    <details class="explain">
+      <summary>Que faire en cas de mémoire GPU insuffisante ?</summary>
+      <ol>
+        <li>Baissez le <strong>budget VRAM</strong> à la mémoire réellement libre (ex. 20 si le bureau en occupe 2).</li>
+        <li>Activez <strong>décharger l'AR pendant la synthèse</strong> : gain important, coût en temps faible avec beaucoup de RAM.</li>
+        <li>Réduisez <strong>max_tokens</strong> sémantiques (durée du morceau) dans l'onglet Échantillonnage.</li>
+        <li>En dernier recours, essayez la quantification <strong>fp8</strong> (expérimentale, plus lente, qualité non garantie).</li>
+      </ol>
+    </details>
+  </fieldset>
+
+  <footer class="form-footer">
+    <button type="submit" class="btn primary" name="reload" value="1">Enregistrer et recharger</button>
+    <button type="submit" class="btn" name="reload" value="0">Enregistrer</button>
+    {% if loaded_settings %}<span class="muted small right">Chargé : {{ loaded_settings.model }} · VAE {{ loaded_settings.vae }} · {{ loaded_settings.backend }} · {{ loaded_settings.quantization }} · budget {{ loaded_settings.budget }} Go</span>{% endif %}
+  </footer>
+</form>
+<div id="assistant-settings">{% include "partials/assistant_settings.html" %}</div>

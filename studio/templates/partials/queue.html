@@ -1,0 +1,61 @@
+{% import "macros.html" as m %}
+<div class="queue">
+  <div class="panel-head">
+    <h2>En cours</h2>
+    {% if queued %}<span class="muted">{{ queued|length }} en attente</span>{% endif %}
+  </div>
+
+  {% if current %}
+  {% set job = current %}
+  <article class="job-card running" data-job="{{ job.id }}">
+    <header>
+      <div>
+        <strong>{{ job.name }}</strong>
+        <span class="muted">· {{ m.kind_label(job) }} · {{ job.request.cot }}</span>
+      </div>
+      <div class="job-actions">
+        <span class="mono muted">{{ job.elapsed|duration }}</span>
+        <button class="btn danger tiny" hx-post="/jobs/{{ job.id }}/cancel" hx-target="#queue" hx-swap="innerHTML"
+                {% if job.cancel_requested %}disabled{% endif %}>{{ "annulation…" if job.cancel_requested else "annuler" }}</button>
+      </div>
+    </header>
+    <ol class="stages">
+      {% for s in job.stages %}
+      <li class="stage stage-{{ s.status }}">
+        <span class="stage-icon"></span>
+        <span class="stage-label">{{ s.label_fr }}</span>
+        <span class="stage-metrics mono">
+          {% if s.total %}{{ s.completed }}/{{ s.total }} {{ s.unit or "" }}{% elif s.completed %}{{ s.completed }} {{ s.unit or "" }}{% endif %}
+          {% if s.status == "running" and s.rate %}· {{ s.rate|rate(s.unit) }}{% endif %}
+          · {{ s.elapsed|duration }}
+        </span>
+        {% if s.status == "running" %}
+        <span class="bar {% if not s.total %}indeterminate{% endif %}"><span style="width: {{ (s.percent or 0)|round(1) }}%"></span></span>
+        {% endif %}
+      </li>
+      {% endfor %}
+      {% if not job.stages %}<li class="stage stage-running"><span class="stage-icon"></span><span class="stage-label">Préparation…</span><span class="bar indeterminate"><span></span></span></li>{% endif %}
+    </ol>
+    {% if job.live_abc and job.current_stage and job.current_stage.label == "Planning score" %}
+    <div class="live-abc">
+      <div class="muted small">Partition en cours d'écriture · {{ job.live_tokens }} tokens</div>
+      <pre class="code" data-role="live-abc">{{ job.live_abc }}</pre>
+    </div>
+    {% endif %}
+  </article>
+  {% else %}
+  <p class="muted empty">Aucun job en cours.{% if model_state == "ready" %} Le pipeline est chargé et prêt.{% endif %}</p>
+  {% endif %}
+
+  {% if queued %}
+  <ul class="queued">
+    {% for job in queued %}
+    <li>
+      <span class="pos mono">{{ loop.index }}</span>
+      <span><strong>{{ job.name }}</strong> <span class="muted">· {{ m.kind_label(job) }}</span></span>
+      <button class="btn ghost tiny" hx-post="/jobs/{{ job.id }}/cancel" hx-target="#queue" hx-swap="innerHTML">retirer</button>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>

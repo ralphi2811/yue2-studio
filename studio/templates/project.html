@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% set page = "landing" %}
+{% block title %}{{ project.name }} · projet{% endblock %}
+{% block body %}
+<main class="landing project-page">
+  <p class="breadcrumb"><a href="/">♫ Morceaux</a> <span class="muted">/</span> Projet</p>
+  <div id="project" hx-get="/partials/project/{{ project.id }}" hx-trigger="sse:library, library-changed from:body" hx-swap="innerHTML">
+    {% include "partials/project_timeline.html" %}
+  </div>
+</main>
+
+<footer id="global-player" class="global-player" hidden>
+  <button type="button" class="btn primary round" data-player="toggle" aria-label="Lecture / pause">▶</button>
+  <div class="gp-meta">
+    <strong data-player="title">—</strong>
+    <span class="muted small" data-player="sub"></span>
+  </div>
+  <div class="gp-wave" data-player="wave"></div>
+  <span class="mono time"><span data-player="current">0:00</span> / <span data-player="total">0:00</span></span>
+  <div class="gp-actions">
+    <button type="button" class="btn ghost small" data-player="prev" title="Version précédente">⏮</button>
+    <button type="button" class="btn ghost small" data-player="next" title="Version suivante">⏭</button>
+    <a class="btn ghost small" data-player="open" href="#" title="Ouvrir dans le studio">Ouvrir</a>
+    <a class="btn ghost small" data-player="download" href="#" download title="Télécharger le FLAC">⬇</a>
+  </div>
+</footer>
+{% endblock %}

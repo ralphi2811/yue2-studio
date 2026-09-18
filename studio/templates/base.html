@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}YuE2 Studio{% endblock %}</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎛️</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css?v={{ v() }}">
+  <script src="/static/vendor/htmx.min.js?v={{ v() }}" defer></script>
+  <script src="/static/vendor/htmx-sse.js?v={{ v() }}" defer></script>
+  <script src="/static/vendor/wavesurfer.min.js?v={{ v() }}" defer></script>
+  <script src="/static/vendor/abcjs-basic-min.js?v={{ v() }}" defer></script>
+  <script src="/static/app.js?v={{ v() }}" defer></script>
+</head>
+<body hx-ext="sse" sse-connect="/events" class="page-{{ page }}">
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">🎛️</span>
+    <div><strong>YuE2 Studio</strong><span class="sub">génération musicale locale · v0.1.6</span></div>
+  </div>
+  <nav class="mainnav">
+    <a href="/" class="{% if page == 'landing' %}active{% endif %}">♫ Morceaux</a>
+    <a href="/studio" class="{% if page == 'studio' %}active{% endif %}">⚒ Studio</a>
+  </nav>
+  <div id="status" sse-swap="status" hx-get="/partials/status" hx-trigger="status-changed from:body">
+    {% include "partials/status.html" %}
+  </div>
+  <div class="topbar-actions">
+    {% block topbar_actions %}{% endblock %}
+    <button class="btn ghost" data-action="open-settings">⚙︎ Moteur</button>
+  </div>
+</header>
+
+{% block body %}{% endblock %}
+
+<dialog id="confirm-dialog" class="dialog dialog-sm" aria-labelledby="confirm-title">
+  <form method="dialog">
+    <h3 id="confirm-title" data-role="title">Confirmer</h3>
+    <p data-role="message" class="dialog-message"></p>
+    <div class="dialog-actions">
+      <button type="button" class="btn" value="cancel" data-role="cancel">Annuler</button>
+      <button type="button" class="btn primary" value="ok" data-role="ok">OK</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="prompt-dialog" class="dialog dialog-sm" aria-labelledby="prompt-title">
+  <form method="dialog">
+    <h3 id="prompt-title" data-role="title">Instruction</h3>
+    <p data-role="message" class="dialog-message"></p>
+    <textarea data-role="input" rows="3" placeholder=""></textarea>
+    <div class="dialog-actions">
+      <button type="button" class="btn" data-role="cancel">Annuler</button>
+      <button type="button" class="btn primary" data-role="ok">OK</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="settings-dialog" class="dialog">
+  <div id="settings" hx-get="/partials/settings" hx-trigger="load, settings-open from:body" hx-swap="innerHTML">
+    <p class="muted">Chargement…</p>
+  </div>
+</dialog>
+</body>
+</html>

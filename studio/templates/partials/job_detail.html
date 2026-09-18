@@ -1,0 +1,150 @@
+{% import "macros.html" as m %}
+<article class="detail" data-job="{{ job.id }}">
+  <header class="detail-head">
+    <div>
+      <div class="card-title">
+        <h2 title="Cliquer pour renommer" data-action="rename">{{ job.name }} <span class="rename-hint">✎</span></h2>
+        <form class="rename" hx-patch="/jobs/{{ job.id }}/name?view=detail" hx-target="#detail" hx-swap="innerHTML" hidden>
+          <input type="text" name="name" value="{{ job.name }}" maxlength="120" required>
+          <button type="submit" class="btn primary tiny">OK</button>
+          <button type="button" class="btn ghost tiny" data-action="rename-cancel">✕</button>
+        </form>
+      </div>
+      <p class="muted small">{{ m.kind_label(job) }} · mode {{ job.request.cot }} · seed <span class="mono">{{ job.request.seed }}</span>
+        {% if job.request.cfg_scale is not none %} · CFG {{ job.request.cfg_scale }}{% endif %}
+        · {{ job.created|replace("T", " ") }}{% if job.elapsed %} · {{ job.elapsed|duration }} de calcul{% endif %}</p>
+    </div>
+    {{ m.status_pill(job) }}
+  </header>
+
+  {% if flash %}<div class="alert ok">{{ flash }}</div>{% endif %}
+  {% if job.error %}<div class="alert error"><strong>{{ job.error }}</strong>{% if trace %}<details><summary>Trace complète</summary><pre>{{ trace }}</pre></details>{% endif %}</div>{% endif %}
+  {% if job.summary.trim_note %}<div class="alert warn"><strong>Partition raccourcie.</strong> {{ job.summary.trim_note }}</div>{% endif %}
+  {% set tr = job.summary.truncated or {} %}
+  {% if tr.abc or tr.semantic %}
+  <div class="alert warn">Sortie tronquée : {% if tr.abc %}la partition{% endif %}{% if tr.abc and tr.semantic %} et {% endif %}{% if tr.semantic %}les tokens sémantiques{% endif %} ont atteint leur plafond. {% if job.summary.truncation_note %}{{ job.summary.truncation_note }}{% else %}Le fichier reste exploitable mais la fin peut être abrupte. Augmentez la limite ou raccourcissez les paroles.{% endif %}</div>
+  {% endif %}
+
+  {% if has_audio %}
+  <section class="player" data-src="/jobs/{{ job.id }}/file/audio.flac">
+    <div class="player-controls">
+      <button type="button" class="btn primary round" data-action="play" aria-label="Lecture">▶</button>
+      <span class="mono time"><span data-role="current">0:00</span> / <span data-role="total">{{ job.summary.audio_seconds|duration if job.summary.audio_seconds else "—" }}</span></span>
+      <span class="muted small">48 kHz · stéréo · FLAC 24 bits{% if job.summary.vae %} · VAE {{ job.summary.vae }}{% endif %}</span>
+      <span class="right row gap">
+        <a class="btn ghost small" href="/jobs/{{ job.id }}/file/audio.flac" download>⬇ FLAC</a>
+        <a class="btn ghost small" href="/jobs/{{ job.id }}/audio.wav" download>⬇ WAV</a>
+      </span>
+    </div>
+    <div class="waveform" data-role="wave"></div>
+  </section>
+  {% endif %}
+
+  <div class="actions">
+    <button class="btn" hx-get="/partials/form?from_job={{ job.id }}&mode=reuse" hx-target="#form-panel" hx-swap="innerHTML" title="Recharge tous les réglages de ce job dans le formulaire">↺ Réutiliser les réglages</button>
+    <button class="btn" hx-get="/partials/form?from_job={{ job.id }}&mode=variation" hx-target="#form-panel" hx-swap="innerHTML" title="Mêmes réglages, nouvelle graine">🎲 Variation</button>
+    {% if score %}<button class="btn" hx-get="/partials/form?from_job={{ job.id }}&mode=edit-score" hx-target="#form-panel" hx-swap="innerHTML" title="Charge la partition dans le formulaire pour la modifier puis la re-rendre">✎ Éditer la partition</button>{% endif %}
+    {% if has_latents %}
+      {% for choice in ("standard", "legacy") if choice != job.summary.vae %}
+      <button class="btn ghost" hx-post="/jobs/{{ job.id }}/decode?vae={{ choice }}" hx-target="#detail" hx-swap="innerHTML" title="Décode les mêmes latents avec ce décodeur, sans régénérer la musique">🔁 Re-décoder · VAE {{ choice }}</button>
+      {% endfor %}
+      {% if custom_vae and job.summary.vae != "custom" %}
+      <button class="btn ghost" hx-post="/jobs/{{ job.id }}/decode?vae=custom" hx-target="#detail" hx-swap="innerHTML" title="Décode avec le VAE personnalisé configuré dans le moteur : {{ custom_vae }}">🔁 Re-décoder · VAE personnalisé</button>
+      {% endif %}
+    {% endif %}
+    {% if project %}
+    <a class="btn ghost" href="/projects/{{ project.id }}" title="Frise des versions du projet">✨ Projet « {{ project.name }} » · v{{ project_version.number }}</a>
+    <button class="btn ghost" hx-post="/projects/from-job/{{ job.id }}" hx-target="#assistant-body" hx-swap="innerHTML" title="Ouvrir la conversation du projet dans le tiroir">💬 Assistant</button>
+    {% elif job.status == "done" and job.kind == "song" %}
+    <button class="btn ghost" hx-post="/projects/from-job/{{ job.id }}" hx-target="#assistant-body" hx-swap="innerHTML" title="Crée un projet dont ce morceau est la v1 et ouvre l'assistant pour le retravailler">✨ Retravailler avec l'assistant</button>
+    {% endif %}
+    {% if job.status != "running" %}
+    <button class="btn danger ghost right" hx-delete="/jobs/{{ job.id }}" hx-target="#detail" hx-swap="innerHTML" hx-confirm="Supprimer définitivement « {{ job.name }} » et tous ses fichiers ?">🗑 Supprimer</button>
+    {% endif %}
+  </div>
+
+  <nav class="tabs small" role="tablist">
+    {% if score %}<button type="button" class="tab active" data-tab="d-score">Partition</button>{% endif %}
+    <button type="button" class="tab {% if not score %}active{% endif %}" data-tab="d-request">Requête</button>
+    <button type="button" class="tab" data-tab="d-config">Réglages</button>
+    <button type="button" class="tab" data-tab="d-timing">Temps</button>
+    <button type="button" class="tab" data-tab="d-files">Fichiers</button>
+  </nav>
+
+  {% if score %}
+  <section class="tab-pane active" data-pane="d-score">
+    <div class="abc-toolbar">
+      <span class="muted small">Affichage :</span>
+      <button type="button" class="chip" data-action="abc-zoom" data-mode="real" title="Taille réelle, défilement horizontal">Taille réelle</button>
+      <button type="button" class="chip" data-action="abc-zoom" data-mode="fit" title="Réduit pour tenir dans la largeur">Ajuster à la largeur</button>
+      <span class="right row gap">
+        <button type="button" class="btn ghost small" hx-post="/abc/inspect" hx-vals='{"abc": {{ score|tojson }}}' hx-target="#d-abc-check" hx-swap="innerHTML" title="Validation structurelle par le vérificateur du skill">✓ Valider</button>
+        <a class="btn ghost small" href="/jobs/{{ job.id }}/file/score.abc" download>⬇ .abc</a>
+      </span>
+    </div>
+    <div class="abc-render" data-abc="{{ score }}"></div>
+    {% if score_jobs %}
+    <form class="compare-row" hx-post="/abc/compare" hx-target="#d-abc-check" hx-swap="innerHTML">
+      <input type="hidden" name="after_job" value="{{ job.id }}">
+      <span class="muted small">Comparer la mélodie avec :</span>
+      <select name="before_job" class="inline">
+        {% for other in score_jobs %}<option value="{{ other.id }}">{{ other.name }} · {{ other.created|replace("T", " ") }}</option>{% endfor %}
+      </select>
+      <select name="voices" class="inline"><option value="both">Vocal + Ins</option><option value="Vocal">Vocal</option><option value="Ins">Ins</option></select>
+      <label class="muted small"><input type="checkbox" name="allow_tempo_change" value="1"> tempo libre</label>
+      <button type="submit" class="btn small">⇄ Comparer</button>
+    </form>
+    {% endif %}
+    <div id="d-abc-check"></div>
+    <details><summary>Source ABC</summary><pre class="code">{{ score }}</pre></details>
+  </section>
+  {% endif %}
+
+  <section class="tab-pane {% if not score %}active{% endif %}" data-pane="d-request">
+    <h4>Style</h4><p class="prose">{{ job.request.style }}</p>
+    <h4>Paroles</h4><pre class="lyrics">{{ job.request.lyrics }}</pre>
+    {% if job.request.abc %}<h4>Partition fournie</h4><pre class="code">{{ job.request.abc }}</pre>{% endif %}
+  </section>
+
+  <section class="tab-pane" data-pane="d-config">
+    <table class="kv">
+      <tr><th>Mode CoT</th><td>{{ job.request.cot }}</td></tr>
+      <tr><th>Seed</th><td class="mono">{{ job.request.seed }}</td></tr>
+      <tr><th>CFG</th><td>{{ job.request.cfg_scale if job.request.cfg_scale is not none else "auto" }}</td></tr>
+      <tr><th>Pas ODE</th><td>{{ job.ode_steps }}</td></tr>
+      <tr><th>Durée maximale</th><td>{{ job.max_seconds|duration if job.max_seconds else "aucune" }}{% if job.max_seconds %} <span class="muted">· partition trop longue : {{ {"auto": "raccourcir si instrumental, sinon arrêter", "trim": "raccourcir", "stop": "arrêter"}[job.plan_overflow or "auto"] }}</span>{% endif %}</td></tr>
+      {% if job.summary.guard %}<tr><th>Borne sémantique</th><td class="mono">{{ job.summary.guard.max_tokens }} tokens <span class="muted">· retenue : {{ job.summary.guard.reason }}{% if job.summary.guard.planned_seconds %} · partition {{ job.summary.guard.planned_seconds|duration }}{% endif %}</span></td></tr>{% endif %}
+      <tr><th>Échantillonnage ABC</th><td class="mono">{{ job.abc_sampling if job.abc_sampling else "défauts" }}</td></tr>
+      <tr><th>Échantillonnage sémantique</th><td class="mono">{{ job.semantic_sampling if job.semantic_sampling else "défauts" }}</td></tr>
+      {% if job.engine %}
+      <tr><th>Moteur</th><td class="mono">{{ job.engine.backend }} · {{ job.engine.quantization }} · budget {{ job.engine.budget }} Go{% if job.engine.offload_ar %} · offload AR{% endif %} · VAE {{ job.engine.vae }}{% if job.engine.vae == "custom" %} ({{ job.engine.vae_custom }}){% endif %}</td></tr>
+      {% endif %}
+      {% if config %}
+      <tr><th>Config effective</th><td><details><summary>config.json</summary><pre class="code">{{ config|tojson(indent=2) }}</pre></details></td></tr>
+      {% endif %}
+    </table>
+  </section>
+
+  <section class="tab-pane" data-pane="d-timing">
+    {% set t = job.summary.timing or {} %}
+    <table class="kv">
+      {% if planned %}<tr><th>Durée nominale</th><td>{{ planned.bars }} mesures en {{ planned.meter }} à {{ planned.bpm or "?" }} BPM → <strong>{{ planned.seconds|duration }}</strong>{% if job.summary.audio_seconds %} · audio réel {{ job.summary.audio_seconds|duration }} ({{ "%+.1f"|format(job.summary.audio_seconds - planned.seconds) }} s){% endif %}</td></tr>{% endif %}
+      {% if t.abc %}<tr><th>Planification ABC</th><td>{{ t.abc.seconds|duration }} · {{ t.abc.output_tokens or t.abc.external_prefix_tokens or 0 }} tokens</td></tr>{% endif %}
+      {% if t.semantic %}<tr><th>Tokens sémantiques</th><td>{{ t.semantic.seconds|duration }} · {{ t.semantic.output_tokens }} tokens{% if t.semantic.output_tps %} · {{ "%.1f"|format(t.semantic.output_tps) }} tok/s{% endif %}</td></tr>{% endif %}
+      {% if t.nar_seconds %}<tr><th>Synthèse acoustique</th><td>{{ t.nar_seconds|duration }}</td></tr>{% endif %}
+      {% if t.vae_seconds %}<tr><th>Décodage VAE</th><td>{{ t.vae_seconds|duration }}</td></tr>{% endif %}
+      {% if t.e2e_seconds %}<tr><th>Total pipeline</th><td><strong>{{ t.e2e_seconds|duration }}</strong>{% if job.summary.audio_seconds %} pour {{ job.summary.audio_seconds|duration }} d'audio ({{ "%.1f"|format(job.summary.audio_seconds / t.e2e_seconds) }}× temps réel){% endif %}</td></tr>{% endif %}
+    </table>
+    <h4>Étapes observées</h4>
+    <ol class="stages static">
+      {% for s in job.stages %}<li class="stage stage-{{ s.status }}"><span class="stage-icon"></span><span class="stage-label">{{ s.label_fr }}</span><span class="stage-metrics mono">{% if s.completed %}{{ s.completed }} {{ s.unit or "" }} · {% endif %}{{ s.elapsed|duration }}</span></li>{% endfor %}
+    </ol>
+  </section>
+
+  <section class="tab-pane" data-pane="d-files">
+    <p class="muted small mono">{{ job.output_dir }}</p>
+    <ul class="files">
+      {% for f in files %}<li><a href="/jobs/{{ job.id }}/file/{{ f }}" target="_blank" class="mono">{{ f }}</a></li>{% endfor %}
+    </ul>
+  </section>
+</article>

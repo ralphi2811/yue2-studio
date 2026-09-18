@@ -1,0 +1,32 @@
+{% set state = model_state %}
+<div class="status-bar">
+  <div class="status-item model model-{{ state }}" title="{{ model_error or '' }}">
+    <span class="dot"></span>
+    <span class="label">Modèle</span>
+    <span class="value">
+      {% if state == "ready" %}chargé{% if settings_dirty %} · réglages modifiés{% endif %}
+      {% elif state == "loading" %}chargement…
+      {% elif state == "error" %}erreur
+      {% else %}déchargé{% endif %}
+    </span>
+    {% if state == "ready" %}
+      <button class="btn ghost tiny" hx-post="/engine/unload" hx-target="#status" hx-swap="innerHTML" title="Libérer la VRAM">libérer</button>
+    {% elif state in ("unloaded", "error") %}
+      <button class="btn ghost tiny" hx-post="/engine/load" hx-target="#status" hx-swap="innerHTML" title="Charger le pipeline maintenant">charger</button>
+    {% endif %}
+  </div>
+  {% if gpu %}
+  <div class="status-item gpu" title="{{ gpu.name }} · {{ gpu.temp }} °C · charge {{ gpu.util }} %">
+    <span class="label">VRAM</span>
+    <span class="meter"><span class="fill {% if gpu.percent > 90 %}hot{% elif gpu.percent > 70 %}warm{% endif %}" style="width: {{ gpu.percent|round(1) }}%"></span></span>
+    <span class="value mono">{{ "%.1f"|format(gpu.used_gib) }} / {{ "%.1f"|format(gpu.total_gib) }} Go</span>
+    <span class="value mono muted">{{ gpu.util }} %</span>
+  </div>
+  {% else %}
+  <div class="status-item gpu"><span class="label">GPU</span><span class="value muted">indisponible</span></div>
+  {% endif %}
+  <div class="status-item">
+    <span class="label">File</span>
+    <span class="value mono">{{ (1 if current else 0) + queued|length }}</span>
+  </div>
+</div>

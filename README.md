@@ -1,3 +1,8 @@
+> **YuE2 Studio** — ce dépôt est un fork de [YuE](https://github.com/multimodal-art-projection/YuE) auquel s'ajoute une
+> interface web locale (FastAPI + HTMX) dans [`studio/`](studio/README.md) : tous les paramètres du runtime expliqués,
+> file de génération, bibliothèque, assistant de composition (LLM OpenAI-compatible), projets versionnés et garde-fous de durée.
+> Lancement : `.venv/bin/python -m studio` puis http://localhost:8420. Tests : `.venv/bin/python -m pytest studio/tests -q`.
+
 > Looking for the original YuE? Its code, documentation, and license are preserved on the **[YuE-v1 branch](https://github.com/multimodal-art-projection/YuE/tree/YuE-v1)**.
 
 <p align="center">

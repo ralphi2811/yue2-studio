@@ -1,0 +1,30 @@
+{% import "macros.html" as m %}
+<div class="library">
+  <div class="panel-head">
+    <h2>Bibliothèque <span class="muted">({{ history|length }})</span></h2>
+    <input type="search" class="search" name="q" value="{{ q or '' }}" placeholder="filtrer par nom ou style…"
+           hx-get="/partials/library" hx-trigger="input changed delay:250ms, search" hx-target="#library" hx-swap="innerHTML">
+  </div>
+  {% if not history %}
+  <p class="muted empty">Aucun morceau pour l'instant. Lancez une génération : le résultat apparaîtra ici avec son lecteur, sa partition et ses réglages.</p>
+  {% endif %}
+  <ul class="tracks">
+    {% for job in history %}
+    <li class="track st-{{ job.status }}" data-job="{{ job.id }}" hx-get="/jobs/{{ job.id }}" hx-target="#detail" hx-swap="innerHTML" role="button" tabindex="0">
+      <div class="track-main">
+        <span class="track-name">{{ job.name }}</span>
+        <span class="track-meta muted">
+          {{ m.kind_label(job) }} · {{ job.request.cot }} · seed {{ job.request.seed }}
+          {% if job.summary.audio_seconds %} · {{ job.summary.audio_seconds|duration }}{% endif %}
+          {% if job.summary.truncated and (job.summary.truncated.abc or job.summary.truncated.semantic) %} · <span class="warn">tronqué</span>{% endif %}
+        </span>
+        <span class="track-style muted">{{ job.request.style|truncate(110) }}</span>
+      </div>
+      <div class="track-side">
+        {{ m.status_pill(job) }}
+        <span class="mono muted small">{{ job.created|replace("T", " ") }}</span>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</div>

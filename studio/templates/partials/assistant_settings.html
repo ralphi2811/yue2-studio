@@ -1,0 +1,52 @@
+{# Formulaire du connecteur LLM, inclus dans le dialogue Moteur #}
+<form hx-post="/assistant/settings" hx-target="#assistant-settings" hx-swap="innerHTML" class="settings-form" id="assistant-settings-form">
+  <fieldset class="group">
+    <legend>Assistant LLM <span class="muted">(OpenAI-compatible)</span></legend>
+    {% if llm_flash %}<div class="alert ok small">{{ llm_flash }}</div>{% endif %}
+    {% if llm_error %}<div class="alert error small">{{ llm_error }}</div>{% endif %}
+    <p class="group-help">Un seul protocole pour tous les fournisseurs. Préréglages :
+      <button type="button" class="chip" data-action="llm-preset" data-url="https://openrouter.ai/api/v1" data-model="anthropic/claude-sonnet-4.5">OpenRouter</button>
+      <button type="button" class="chip" data-action="llm-preset" data-url="https://api.openai.com/v1" data-model="gpt-5">OpenAI</button>
+      <button type="button" class="chip" data-action="llm-preset" data-url="https://api.mistral.ai/v1" data-model="mistral-large-latest">Mistral</button>
+      <button type="button" class="chip" data-action="llm-preset" data-url="http://localhost:11434/v1" data-model="qwen3:32b">Ollama (local)</button>
+      <button type="button" class="chip" data-action="llm-preset" data-url="http://localhost:1234/v1" data-model="">LM Studio (local)</button>
+    </p>
+    <div class="field">
+      <div class="field-head"><label for="llm-base-url">URL de base</label></div>
+      <input type="text" id="llm-base-url" name="base_url" value="{{ llm.base_url }}" placeholder="https://openrouter.ai/api/v1" autocomplete="off">
+      <p class="help" style="display:block">Racine de l'API, jusqu'au <code>/v1</code>. Le studio appelle <code>/chat/completions</code> et <code>/models</code>.</p>
+    </div>
+    <div class="grid-2">
+      <div class="field">
+        <div class="field-head"><label for="llm-model">Modèle</label></div>
+        <input type="text" id="llm-model" name="model" value="{{ llm.model }}" placeholder="anthropic/claude-sonnet-4.5 · gpt-5 · qwen3:32b" autocomplete="off" list="llm-models">
+        <datalist id="llm-models"></datalist>
+        <p class="help" style="display:block">Pour de bonnes paroles en français, préférez un grand modèle. En local sur la 4090, un 24 à 32B quantifié fonctionne mais ne tournera pas en même temps que YuE2.</p>
+      </div>
+      <div class="field">
+        <div class="field-head"><label for="llm-key">Clé API</label></div>
+        <input type="password" id="llm-key" name="api_key" value="" placeholder="{{ 'définie par la variable YUE2_LLM_API_KEY' if llm.key_from_env else ('clé enregistrée · laisser vide pour conserver' if llm.has_key else 'sk-…') }}" autocomplete="new-password" {% if llm.key_from_env %}disabled{% endif %}>
+        <p class="help" style="display:block">Stockée dans <code>studio/data/assistant.json</code> (hors git, lecture seule utilisateur). La variable d'environnement <code>YUE2_LLM_API_KEY</code> a priorité. Inutile pour Ollama ou LM Studio.</p>
+        {% if llm.has_key and not llm.key_from_env %}<label class="muted small"><input type="checkbox" name="clear_key" value="1"> effacer la clé enregistrée</label>{% endif %}
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="field">
+        <div class="field-head"><label for="llm-temp">Température</label></div>
+        <input type="number" id="llm-temp" name="temperature" value="{{ llm.temperature }}" min="0" max="2" step="0.05">
+      </div>
+      <div class="field">
+        <div class="field-head"><label for="llm-max">Tokens de sortie max</label></div>
+        <input type="number" id="llm-max" name="max_tokens" value="{{ llm.max_tokens }}" min="256" max="32000" step="1">
+      </div>
+    </div>
+    <div class="row gap">
+      <button type="submit" class="btn primary small">Enregistrer</button>
+      <button type="submit" class="btn small" name="test" value="1" title="Enregistre puis interroge /models et fait un mini appel">Enregistrer et tester</button>
+      {% if llm.ready %}<span class="muted small">Actif : {{ llm.model }} @ {{ llm.base_url }}</span>{% endif %}
+    </div>
+    {% if llm_models %}
+    <p class="muted small" style="margin-top:8px">Modèles annoncés par le service ({{ llm_models|length }}) : <span class="mono">{{ llm_models[:12]|join(", ") }}{% if llm_models|length > 12 %}, …{% endif %}</span></p>
+    {% endif %}
+  </fieldset>
+</form>

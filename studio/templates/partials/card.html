@@ -1,0 +1,47 @@
+{% import "macros.html" as m %}
+{% set has_audio = job.status == "done" and job.summary.has_audio %}
+{% set project = project if project is defined else none %}
+{% set hue = ((project.id if project else job.id) | hash_hue) %}
+<article class="card st-{{ job.status }} {% if project %}is-project{% endif %}" data-job="{{ job.id }}" data-name="{{ (project.name ~ ' · v' ~ (version_count or 1)) if project else job.name }}" {% if has_audio %}data-audio="/jobs/{{ job.id }}/file/audio.flac"{% endif %} data-sub="{{ job.request.cot }} · seed {{ job.request.seed }}{% if job.summary.audio_seconds %} · {{ job.summary.audio_seconds|duration }}{% endif %}">
+  <div class="cover" style="--h1: {{ hue }}; --h2: {{ (hue + 40) % 360 }};" {% if has_audio %}data-player="play-card" role="button" tabindex="0" title="Écouter"{% endif %}>
+    <span class="cover-letter">{{ (project.name if project else job.name)[:1]|upper }}</span>
+    {% if project %}<span class="cover-badge cover-versions">✨ {{ version_count }} version{{ "s" if version_count > 1 else "" }}</span>{% endif %}
+    {% if has_audio %}<span class="cover-play">▶</span>{% else %}<span class="cover-badge">{{ m.kind_label(job) if job.status == "done" else {"failed": "échec", "cancelled": "annulé"}.get(job.status, job.status) }}</span>{% endif %}
+    {% if job.summary.audio_seconds %}<span class="cover-duration mono">{{ job.summary.audio_seconds|duration }}</span>{% endif %}
+  </div>
+  <div class="card-body">
+    <div class="card-title">
+      {% if project %}
+      <h3 title="Projet · cliquer pour renommer" data-action="rename">{{ project.name }}</h3>
+      <form class="rename" hx-patch="/projects/{{ project.id }}/name" hx-target="closest .card" hx-swap="none" hidden>
+        <input type="text" name="name" value="{{ project.name }}" maxlength="120" required>
+      {% else %}
+      <h3 title="Cliquer pour renommer" data-action="rename">{{ job.name }}</h3>
+      <form class="rename" hx-patch="/jobs/{{ job.id }}/name" hx-target="closest .card" hx-swap="outerHTML" hidden>
+        <input type="text" name="name" value="{{ job.name }}" maxlength="120" required>
+      {% endif %}
+        <button type="submit" class="btn primary tiny">OK</button>
+        <button type="button" class="btn ghost tiny" data-action="rename-cancel">✕</button>
+      </form>
+    </div>
+    <p class="card-style" title="{{ job.request.style }}">{{ job.request.style }}</p>
+    <div class="card-meta muted small">
+      <span>{{ job.request.cot }}</span> · <span class="mono">seed {{ job.request.seed }}</span> · <span>{{ job.created[:10] }}</span>
+      {% if job.summary.truncated and (job.summary.truncated.abc or job.summary.truncated.semantic) %} · <span class="warn">tronqué</span>{% endif %}
+      {% if job.summary.vae and job.summary.vae != "standard" %} · <span>VAE {{ job.summary.vae }}</span>{% endif %}
+    </div>
+    <div class="card-actions">
+      {% if project %}
+      <a class="btn ghost small" href="/projects/{{ project.id }}" title="Frise des versions et conversation">Versions</a>
+      <a class="btn ghost small" href="/studio#project={{ project.id }}" title="Continuer avec l'assistant">✨</a>
+      {% else %}
+      <a class="btn ghost small" href="/studio#job={{ job.id }}">Ouvrir</a>
+      {% if has_audio %}<button class="btn ghost small" hx-post="/projects/from-job/{{ job.id }}?target=page" title="Retravailler avec l'assistant : crée un projet dont ce morceau est la v1">✨</button>{% endif %}
+      {% endif %}
+      {% if has_audio %}<a class="btn ghost small" href="/jobs/{{ job.id }}/file/audio.flac" download title="Télécharger l'audio (FLAC)">⬇</a>{% endif %}
+      {% if job.summary.has_score %}<a class="btn ghost small" href="/jobs/{{ job.id }}/file/score.abc" download title="Partition ABC">♩</a>{% endif %}
+      {% if project %}<button class="btn ghost small danger right" hx-delete="/projects/{{ project.id }}?with_jobs=1&card=1" hx-target="closest .card" hx-swap="outerHTML swap:200ms" hx-confirm="Supprimer le projet « {{ project.name }} », sa conversation et ses {{ version_count }} version{{ 's' if version_count > 1 else '' }} audio ? Cette action est définitive." title="Supprimer le projet et ses versions">🗑</button>
+      {% else %}<button class="btn ghost small danger right" hx-delete="/jobs/{{ job.id }}" hx-target="closest .card" hx-swap="outerHTML swap:200ms" hx-confirm="Supprimer définitivement « {{ job.name }} » et tous ses fichiers ?" title="Supprimer">🗑</button>{% endif %}
+    </div>
+  </div>
+</article>

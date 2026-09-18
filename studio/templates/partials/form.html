@@ -1,0 +1,159 @@
+{% import "macros.html" as m %}
+<form id="job-form" hx-post="/jobs" hx-target="#form-panel" hx-swap="innerHTML" hx-indicator="#submit-indicator" autocomplete="off" data-open-tab="{{ open_tab or '' }}">
+  <input type="hidden" name="source_job" value="{{ values.get('source_job') or '' }}">
+  <input type="hidden" name="project_id" value="{{ values.get('project_id') or '' }}">
+  {% set proj = project_of(values.get('project_id')) %}
+  <div class="panel-head">
+    <h2>Nouveau morceau</h2>
+    {% if proj %}<span class="project-badge" title="Cette génération sera enregistrée comme version du projet">✨ {{ proj.name }} · v{{ proj.next_number }} <button type="button" class="btn ghost tiny" data-action="detach-project" title="Générer hors projet">✕</button></span>{% endif %}
+    <nav class="tabs" role="tablist">
+      <button type="button" class="tab active" data-tab="song">Chanson</button>
+      <button type="button" class="tab" data-tab="score">Partition</button>
+      <button type="button" class="tab" data-tab="advanced">Échantillonnage</button>
+      <button type="button" class="tab" data-tab="batch">Lot</button>
+    </nav>
+  </div>
+
+  {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+  {% if flash %}<div class="alert ok">{{ flash }}</div>{% endif %}
+
+  {# ---------------- Onglet Chanson ---------------- #}
+  <section class="tab-pane active" data-pane="song">
+    {% for p in P.REQUEST if p.key == "name" %}{{ m.field(p, values) }}{% endfor %}
+
+    {% for p in P.REQUEST if p.key == "style" %}
+    {{ m.field(p, values) }}
+    <div class="presets">
+      {% if llm_ready() %}<button type="button" class="chip accent" data-action="quick" data-kind="style" title="Demande au LLM de préciser et enrichir ce prompt">✨ Améliorer</button>{% endif %}
+      <span class="muted small">Préréglages :</span>
+      {% for label, prompt in STYLE_PRESETS %}
+      <button type="button" class="chip" data-action="preset" data-prompt="{{ prompt }}">{{ label }}</button>
+      {% endfor %}
+    </div>
+    {% endfor %}
+
+    {% for p in P.REQUEST if p.key == "lyrics" %}
+    {{ m.field(p, values) }}
+    <div class="lyrics-tools">
+      {% if llm_ready() %}<button type="button" class="chip accent" data-action="quick" data-kind="lyrics" title="Demande au LLM de retravailler prosodie, rimes et refrain (une instruction facultative vous sera demandée)">✨ Retravailler</button>{% endif %}
+      <span class="muted small">Insérer :</span>
+      {% for tag in LYRIC_TAGS %}<button type="button" class="chip mono" data-action="tag" data-tag="{{ tag }}">{{ tag }}</button>{% endfor %}
+      <span class="lyrics-stats mono muted" id="lyrics-stats"></span>
+    </div>
+    <div id="quick-why" class="quick-why" hidden></div>
+    {% endfor %}
+
+    <div class="grid-2">
+      {% for p in P.REQUEST if p.key == "cot" %}{{ m.field(p, values) }}{% endfor %}
+      {% for p in P.REQUEST if p.key == "seed" %}{{ m.field(p, values) }}{% endfor %}
+    </div>
+    <div class="grid-2">
+      {% for p in P.REQUEST if p.key == "cfg_scale" %}{{ m.field(p, values) }}{% endfor %}
+      {% for p in P.REQUEST if p.key == "max_duration" %}{{ m.field(p, values) }}{% endfor %}
+    </div>
+    {% for p in P.REQUEST if p.key == "plan_overflow" %}{{ m.field(p, values) }}{% endfor %}
+    <div id="lyrics-warning" class="alert warn small" hidden></div>
+
+    <details class="explain">
+      <summary>Comment fonctionne la génération ?</summary>
+      <p>{{ P.PANEL_HELP.workflow }}</p>
+    </details>
+  </section>
+
+  {# ---------------- Onglet Partition ---------------- #}
+  <section class="tab-pane" data-pane="score">
+    {% for p in P.REQUEST if p.key == "abc" %}{{ m.field(p, values) }}{% endfor %}
+    <div class="row gap">
+      <label class="btn ghost small">Importer un .abc <input type="file" accept=".abc,.txt" data-action="import-abc" hidden></label>
+      <button type="button" class="btn ghost small" data-action="clear-abc">Effacer</button>
+      <span class="muted small" id="abc-status"></span>
+    </div>
+
+    <fieldset class="group tools">
+      <legend>Outils de partition <span class="muted">(skill yue2-music)</span></legend>
+      <div class="row gap">
+        <button type="button" class="btn small" hx-post="/abc/inspect" hx-include="[name='abc']" hx-target="#abc-check" hx-swap="innerHTML" title="Vérifie la structure : mesures, ties, altérations, accords du vocabulaire natif. Calcule la durée nominale.">✓ Valider</button>
+        <span class="row gap">
+          <button type="button" class="btn small" data-action="strip-chords" title="Retire les symboles d'accords sans toucher aux notes, pour une reprise en mode melody">♯ Retirer les accords</button>
+          <select name="keep_voice" class="inline" title="Voix à conserver : l'autre est remplacée par des silences">
+            <option value="both">garder Vocal + Ins</option>
+            <option value="Vocal">garder Vocal seule</option>
+            <option value="Ins">garder Ins seule</option>
+          </select>
+        </span>
+        {% if values.get('source_job') %}
+        <span class="row gap">
+          <button type="button" class="btn small" hx-post="/abc/compare" hx-include="[name='abc'], [name='source_job'], [name='cmp_voices'], [name='allow_tempo_change']" hx-vals='{"before_job": "{{ values.source_job }}"}' hx-target="#abc-check" hx-swap="innerHTML" title="Vérifie que les notes, onsets, durées et mesures sont inchangés par rapport à la partition d'origine (réharmonisation stricte)">⇄ Comparer à l'original</button>
+          <select name="cmp_voices" class="inline"><option value="both">Vocal + Ins</option><option value="Vocal">Vocal</option><option value="Ins">Ins</option></select>
+          <label class="muted small"><input type="checkbox" name="allow_tempo_change" value="1"> tempo libre</label>
+        </span>
+        {% endif %}
+      </div>
+      <div id="abc-check"></div>
+      <p class="group-help">Le vérificateur est strict : il rejette tuplets, ornements et accords hors vocabulaire natif. « Retirer les accords » valide avant et après, et garantit que la mélodie est intacte. La comparaison est l'invariant à contrôler après une réharmonisation : mêmes notes, seuls les accords changent.</p>
+    </fieldset>
+
+    <div class="abc-toolbar">
+      <span class="muted small">Affichage :</span>
+      <button type="button" class="chip" data-action="abc-zoom" data-mode="real" title="Taille réelle, défilement horizontal">Taille réelle</button>
+      <button type="button" class="chip" data-action="abc-zoom" data-mode="fit" title="Réduit pour tenir dans la largeur">Ajuster à la largeur</button>
+    </div>
+    <div id="abc-preview" class="abc-preview"></div>
+    <details class="explain">
+      <summary>Quand fournir une partition ?</summary>
+      <p>{{ P.PANEL_HELP.plan_only }}</p>
+      <p>Pour une reprise : partez d'une partition sans symboles d'accords et choisissez le mode <em>melody</em>. Pour une réharmonisation : gardez la mélodie, changez les accords entre guillemets et choisissez le mode <em>full</em>. Le vocabulaire d'accords natif est : majeur (sans suffixe), m, dim, aug, 7, maj7, m7, dim7, m7b5, sus4, sus2, 6, m6, 7sus4, m(maj7), avec basse optionnelle (ex. <code>F#m7/C#</code>).</p>
+    </details>
+  </section>
+
+  {# ---------------- Onglet Échantillonnage ---------------- #}
+  <section class="tab-pane" data-pane="advanced">
+    <div class="alert info small">Les valeurs par défaut sont le protocole de référence des auteurs. Modifiez-les pour expérimenter ; chaque job enregistre les réglages effectivement utilisés.</div>
+
+    <fieldset class="group" id="group-abc-sampling">
+      <legend>Planification de la partition <span class="muted">(phase ABC)</span></legend>
+      <p class="group-help">Contrôle la génération du texte ABC : mélodie, accords, structure. Ignoré en mode <em>off</em> ou si vous fournissez une partition.</p>
+      <div class="grid-2">{% for p in P.ABC_SAMPLING %}{{ m.field(p, values) }}{% endfor %}</div>
+    </fieldset>
+
+    <fieldset class="group">
+      <legend>Génération des tokens sémantiques <span class="muted">(phase musique)</span></legend>
+      <p class="group-help">Contrôle la génération de la musique discrète (timbre, interprétation, durée). <code>max_tokens</code> borne la durée : <span id="duration-estimate" class="mono"></span></p>
+      <div class="grid-2">{% for p in P.SEMANTIC_SAMPLING %}{{ m.field(p, values) }}{% endfor %}</div>
+    </fieldset>
+
+    <fieldset class="group">
+      <legend>Synthèse acoustique</legend>
+      {% for p in P.GENERATION %}{{ m.field(p, values) }}{% endfor %}
+    </fieldset>
+
+    <div class="row">
+      <button type="button" class="btn ghost small" data-action="reset-advanced">Rétablir les valeurs de référence</button>
+    </div>
+  </section>
+
+  {# ---------------- Onglet Lot ---------------- #}
+  <section class="tab-pane" data-pane="batch">
+    <p class="muted">Importez plusieurs requêtes d'un coup : un fichier <code>.jsonl</code> (un objet JSON par ligne, format de la CLI <code>yue2 batch</code>), un tableau <code>.json</code>, ou un <code>.csv</code> avec en-têtes. Chaque ligne devient un job dans la file, exécuté dans l'ordre.</p>
+    <table class="kv compact">
+      <tr><th>Champs reconnus</th><td class="mono">name (ou id), style (ou tags), lyrics, cot, seed, cfg_scale, abc, ode_steps, kind (song|plan), abc_sampling {…}, semantic_sampling {…}</td></tr>
+      <tr><th>Héritage</th><td>Tout champ absent d'une ligne prend la valeur du formulaire courant (style, paroles, échantillonnage…). Pratique pour faire varier seulement la seed ou le style.</td></tr>
+      <tr><th>CSV</th><td>Les retours à la ligne des paroles peuvent s'écrire <code>\n</code> dans une cellule.</td></tr>
+    </table>
+    <div class="row gap" style="margin-top:10px">
+      <label class="btn small">Choisir un fichier… <input type="file" id="batch-file" accept=".jsonl,.json,.csv,.txt" hidden></label>
+      <span id="batch-filename" class="muted small"></span>
+      <button type="button" class="btn primary small" id="batch-submit" disabled data-action="batch-submit">▶ Ajouter le lot à la file</button>
+      <a class="btn ghost small right" href="/batch/template.jsonl" download>⬇ Modèle .jsonl</a>
+    </div>
+    <div id="batch-result"></div>
+  </section>
+
+  <footer class="form-footer">
+    <button type="submit" name="kind" value="song" class="btn primary">▶ Générer le morceau</button>
+    <button type="submit" name="kind" value="plan" class="btn" id="btn-plan" title="{{ P.PANEL_HELP.plan_only }}">♩ Planifier seulement</button>
+    <span id="submit-indicator" class="htmx-indicator spinner"></span>
+    <span id="duration-badge" class="duration-badge mono" title=""></span>
+    <button type="button" class="btn ghost small right" hx-get="/partials/form" hx-target="#form-panel" hx-swap="innerHTML" hx-confirm="Réinitialiser le formulaire ?">Réinitialiser</button>
+  </footer>
+</form>

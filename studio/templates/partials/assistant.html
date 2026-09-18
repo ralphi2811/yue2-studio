@@ -1,0 +1,91 @@
+{# Panneau de l'assistant : sélecteur de projet, conversation, composeur. Rendu complet à chaque tour. #}
+<div class="assistant" data-project="{{ project.id if project else '' }}">
+  <div class="panel-head">
+    <h2>✨ Assistant</h2>
+    <select class="inline project-select" title="Projet en cours : conversation + versions" hx-get="/assistant/panel" hx-target="#assistant-body" hx-swap="innerHTML" hx-trigger="change" name="project_id">
+      <option value="" {% if not project %}selected{% endif %}>— choisir un projet —</option>
+      {% for p in projects %}<option value="{{ p.id }}" {% if project and p.id == project.id %}selected{% endif %}>{{ p.name }}{% if p.versions %} · v{{ p.latest.number }}{% endif %}</option>{% endfor %}
+    </select>
+    <button type="button" class="btn ghost tiny" hx-post="/assistant/reset" hx-target="#assistant-body" hx-swap="innerHTML" title="Nouveau projet vierge (celui-ci reste dans la liste)">＋</button>
+    <button type="button" class="btn ghost tiny" data-action="close-assistant" title="Replier l'assistant (le bouton ✨ Assistant le rouvre)">✕</button>
+  </div>
+  <div class="assistant-sub muted small">
+    {% if project %}
+      <span>{{ project.name }}</span>
+      {% if project.versions %} · {{ project.versions|length }} version{{ "s" if project.versions|length > 1 else "" }} · <a href="/projects/{{ project.id }}">frise</a>{% endif %}
+      {% if project.seed is not none %} · seed <span class="mono">{{ project.seed }}</span>{% endif %}
+    {% else %}
+      <span>Aucun projet ouvert : le premier message en créera un.</span>
+    {% endif %}
+    <span class="right">{{ settings.model if settings.ready else "LLM non configuré" }}</span>
+  </div>
+
+  {% if not settings.ready %}
+  <div class="alert info small">Configurez d'abord le connecteur LLM : <button type="button" class="btn ghost tiny" data-action="open-settings">⚙︎ Moteur → Assistant LLM</button>. N'importe quel service OpenAI-compatible fonctionne : OpenRouter, OpenAI, Mistral, ou en local Ollama, LM Studio, vLLM.</div>
+  {% endif %}
+
+  <div class="chat" data-role="chat">
+    {% if not project or not project.turns %}
+    <div class="msg assistant">
+      <p>Décrivez le morceau que vous imaginez en une ou deux phrases : thème, langue, ambiance, références, durée. Je poserai ensuite quelques questions courtes, puis je vous proposerai un style, des paroles et des réglages prêts à générer, avec les raisons de chaque choix. Chaque génération lancée depuis cette conversation deviendra une version du projet.</p>
+      <div class="starters">
+        <button type="button" class="chip" data-action="starter">Une chanson française mélancolique sur une ville la nuit, voix féminine douce, 2 minutes</button>
+        <button type="button" class="chip" data-action="starter">Un rock énergique en anglais pour une intro de vidéo, 45 secondes, voix masculine</button>
+        <button type="button" class="chip" data-action="starter">Une berceuse en français pour un enfant qui s'appelle Léo, guitare acoustique</button>
+      </div>
+    </div>
+    {% endif %}
+    {% for turn in (project.turns if project else []) %}
+    {% if turn.role == "note" %}
+    <div class="msg note"><span>ⓘ {{ turn.text }}</span></div>
+    {% else %}
+    <div class="msg {{ turn.role }}">
+      {% if turn.error %}
+      <div class="alert error small"><strong>Erreur LLM</strong> : {{ turn.error }}</div>
+      {% else %}
+      {% if turn.text %}<p>{{ turn.text }}</p>{% endif %}
+      {% if turn.proposal %}
+      {% set p = turn.proposal %}
+      <div class="proposal">
+        <div class="proposal-head">
+          <strong>Proposition : {{ p.name }}</strong>
+          <span class="muted small">{{ p.cot }}{% if p.cfg_scale is not none %} · CFG {{ p.cfg_scale }}{% endif %} · ≈ {{ p.estimated_seconds|duration }}{% if p.target_duration_seconds %} (cible {{ p.target_duration_seconds|duration }}){% endif %}</span>
+        </div>
+        {% if turn.warnings %}<ul class="proposal-warnings">{% for w in turn.warnings %}<li>{{ w }}</li>{% endfor %}</ul>{% endif %}
+        <h4>Style</h4><p class="prose">{{ p.style }}</p>
+        {% if p.rationale.style %}<p class="why">{{ p.rationale.style }}</p>{% endif %}
+        <h4>Paroles</h4><pre class="lyrics">{{ p.lyrics }}</pre>
+        {% if p.rationale.lyrics %}<p class="why">{{ p.rationale.lyrics }}</p>{% endif %}
+        {% if p.rationale.duration %}<p class="why">Durée : {{ p.rationale.duration }}</p>{% endif %}
+        <h4>Réglages</h4>
+        <table class="kv compact">
+          <tr><th>Mode</th><td>{{ p.cot }}{% if p.rationale.cot %} <span class="muted">· {{ p.rationale.cot }}</span>{% endif %}</td></tr>
+          <tr><th>CFG</th><td>{{ p.cfg_scale if p.cfg_scale is not none else "défaut" }}{% if p.rationale.cfg_scale %} <span class="muted">· {{ p.rationale.cfg_scale }}</span>{% endif %}</td></tr>
+          <tr><th>Seed</th><td class="mono">{{ p.seed if p.seed is not none else (project.seed if project.seed is not none else "défaut") }}{% if p.seed is none and project.seed is not none %} <span class="muted">· graine du projet conservée</span>{% endif %}</td></tr>
+          {% if p.ode_steps %}<tr><th>Pas ODE</th><td>{{ p.ode_steps }}</td></tr>{% endif %}
+          <tr><th>Échantillonnage</th><td class="mono">{{ p.semantic_sampling if p.semantic_sampling else "défauts" }}{% if p.abc_sampling %} · abc {{ p.abc_sampling }}{% endif %}{% if p.rationale.sampling %} <span class="muted">· {{ p.rationale.sampling }}</span>{% endif %}</td></tr>
+        </table>
+        {% if loop.last and project.proposal and project.proposal.name == p.name %}
+        <div class="row gap" style="margin-top:8px">
+          <button type="button" class="btn primary small" hx-post="/assistant/apply" hx-vals='{"project_id": "{{ project.id }}"}' hx-target="#form-panel" hx-swap="innerHTML">⇩ Appliquer au formulaire</button>
+          <span class="muted small">Génération suivante = v{{ project.next_number }}.</span>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+      {% endif %}
+    </div>
+    {% endif %}
+    {% endfor %}
+    <div class="msg assistant pending" data-role="pending" hidden><span class="spinner"></span> <span class="muted small">Réflexion en cours…</span></div>
+  </div>
+
+  <form class="composer" hx-post="/assistant/message" hx-target="#assistant-body" hx-swap="innerHTML" hx-indicator="[data-role='pending']" hx-include="#job-form [name='style'], #job-form [name='lyrics'], #job-form [name='cot']">
+    <input type="hidden" name="project_id" value="{{ project.id if project else '' }}">
+    <textarea name="text" rows="2" placeholder="{{ 'Retour d’écoute ou retouche (« refrain plus court », « plus sombre », « 30 s de moins »)…' if project and project.versions else ('Répondez aux questions, ou demandez une retouche…' if project and project.turns else 'Décrivez votre morceau…') }}" {% if not settings.ready %}disabled{% endif %} required></textarea>
+    <button type="submit" class="btn primary" {% if not settings.ready %}disabled{% endif %} title="Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne">Envoyer</button>
+  </form>
+  {% if project and (project.usage.prompt_tokens or project.usage.completion_tokens) %}
+  <p class="muted tiny mono">{{ project.usage.prompt_tokens }} tokens entrée · {{ project.usage.completion_tokens }} tokens sortie</p>
+  {% endif %}
+</div>

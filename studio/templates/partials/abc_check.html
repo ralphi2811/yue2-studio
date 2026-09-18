@@ -1,0 +1,26 @@
+{% if error %}
+<div class="alert error small">
+  <strong>{{ "Comparaison impossible" if kind == "compare" else "Partition refusée par le vérificateur" }}</strong> : {{ error }}
+  <div class="muted">Le vérificateur du skill est plus strict que le modèle (tuplets, ornements, accords hors vocabulaire natif sont rejetés). Un refus signale « hors périmètre du vérificateur », pas forcément une partition inutilisable.</div>
+</div>
+{% elif kind == "inspect" %}
+<div class="alert ok small">
+  <strong>Partition valide</strong> (dialecte natif YuE2) ·
+  {{ data.bpm }} BPM · unité {{ data.unit_length }} · durée nominale <strong>{{ data.nominal_duration_seconds|duration }}</strong>
+  <table class="kv compact">
+    {% for name, v in data.voices.items() %}
+    <tr><th>{{ name }}</th><td>{{ v.measures }} mesures · {{ v.notes }} notes sonnantes · {{ v.chords }} accords{% if v.key_changes %} · {{ v.key_changes }} changement(s) de tonalité{% endif %}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% else %}
+<div class="alert {{ 'ok' if data.match else 'warn' }} small">
+  {% if data.match %}
+  <strong>Mélodie et métrique identiques</strong> sur {{ data.compared_voices|join(" et ") }}{% if data.tempo_change_allowed %} (changement de tempo toléré){% endif %}. Seuls les accords, le style ou les paroles diffèrent : c'est une réharmonisation ou une reprise stricte.
+  {% else %}
+  <strong>Différences détectées</strong> sur {{ data.compared_voices|join(" et ") }} :
+  <ul>{% for d in data.differences %}<li>{{ d }}</li>{% endfor %}</ul>
+  <div class="muted">Attendu si vous avez volontairement modifié la mélodie ou le rythme ; sinon vérifiez les notes signalées.</div>
+  {% endif %}
+</div>
+{% endif %}

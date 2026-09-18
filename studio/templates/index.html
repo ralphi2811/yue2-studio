@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% set page = "studio" %}
+{% block title %}YuE2 Studio · atelier{% endblock %}
+{% block topbar_actions %}
+    <label class="toggle-help" title="Afficher toutes les explications sous les champs">
+      <input type="checkbox" id="toggle-help"> <span>Explications</span>
+    </label>
+    <button class="btn" data-action="toggle-assistant" title="Assistant de composition (LLM)">✨ Assistant</button>
+{% endblock %}
+{% block body %}
+<main class="layout">
+  <section class="panel panel-form" id="form-panel">
+    {% include "partials/form.html" %}
+  </section>
+
+  <section class="panel panel-queue">
+    <div id="queue" sse-swap="queue" hx-get="/partials/queue" hx-trigger="queue-changed from:body">
+      {% include "partials/queue.html" %}
+    </div>
+    <div id="detail" class="detail-empty">
+      <p>Sélectionnez un morceau dans la bibliothèque pour l'écouter, lire sa partition et ses réglages.</p>
+    </div>
+  </section>
+
+  <section class="panel panel-library">
+    <div id="library" sse-swap="library" hx-get="/partials/library" hx-trigger="library-changed from:body">
+      {% include "partials/library.html" %}
+    </div>
+  </section>
+</main>
+
+<aside id="assistant-drawer" class="drawer" hidden aria-label="Assistant de composition">
+  <div id="assistant-body" hx-get="/assistant/panel" hx-trigger="load, assistant-config-changed from:body" hx-swap="innerHTML">
+    <p class="muted">Chargement…</p>
+  </div>
+</aside>
+{% endblock %}

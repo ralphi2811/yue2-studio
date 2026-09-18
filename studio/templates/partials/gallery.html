@@ -1,0 +1,22 @@
+{% import "macros.html" as m %}
+<form id="gallery-controls" class="gallery-controls" hx-get="/partials/gallery" hx-target="#gallery" hx-swap="innerHTML" hx-trigger="input changed delay:250ms from:[name='q'], change from:[name='sort'], change from:[name='all']">
+  <input type="search" name="q" value="{{ q }}" placeholder="rechercher un nom, un style, des paroles…" class="search">
+  <select name="sort" class="inline">
+    <option value="recent" {% if sort == "recent" %}selected{% endif %}>Plus récents</option>
+    <option value="name" {% if sort == "name" %}selected{% endif %}>Nom A → Z</option>
+    <option value="duration" {% if sort == "duration" %}selected{% endif %}>Plus longs</option>
+  </select>
+  <label class="muted small"><input type="checkbox" name="all" value="1" {% if show_all %}checked{% endif %}> afficher aussi les échecs et les partitions seules</label>
+  <span class="muted small right">{{ items|length }} affiché{{ "s" if items|length > 1 else "" }}{% if total_projects %} · {{ total_projects }} projet{{ "s" if total_projects > 1 else "" }}{% endif %}</span>
+</form>
+
+{% if not items %}
+<div class="empty-state">
+  <p>Aucun morceau à afficher.</p>
+  <p class="muted">Lancez une génération depuis le <a href="/studio">studio</a> : elle apparaîtra ici avec sa pochette et son lecteur.</p>
+</div>
+{% else %}
+<div class="cards">
+  {% for it in items %}{% set job = it.job %}{% set project = it.project if it.kind == "project" else none %}{% set version_count = it.count if it.kind == "project" else 0 %}{% include "partials/card.html" %}{% endfor %}
+</div>
+{% endif %}

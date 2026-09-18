@@ -1,0 +1,11 @@
+{% if error %}
+<div class="alert error small">{{ error }}</div>
+{% else %}
+<div class="alert {{ 'ok' if created and not failures else ('warn' if created else 'error') }} small">
+  <strong>{{ created|length }} job{{ "s" if created|length > 1 else "" }} ajouté{{ "s" if created|length > 1 else "" }} à la file</strong>{% if failures %} · {{ failures|length }} ligne{{ "s" if failures|length > 1 else "" }} refusée{{ "s" if failures|length > 1 else "" }}{% endif %}.
+  {% if created %}<div class="muted">{{ created|map(attribute="name")|join(", ")|truncate(200) }}</div>{% endif %}
+  {% if failures %}
+  <ul>{% for index, name, reason in failures %}<li>Ligne {{ index }}{% if name %} ({{ name }}){% endif %} : {{ reason }}</li>{% endfor %}</ul>
+  {% endif %}
+</div>
+{% endif %}

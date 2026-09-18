@@ -1,0 +1,86 @@
+{% import "macros.html" as m %}
+<section class="hero">
+  <div>
+    <div class="card-title">
+      <h1 title="Cliquer pour renommer" data-action="rename">{{ project.name }} <span class="rename-hint">✎</span></h1>
+      <form class="rename" hx-patch="/projects/{{ project.id }}/name" hx-target="#project" hx-swap="innerHTML" hidden>
+        <input type="text" name="name" value="{{ project.name }}" maxlength="120" required>
+        <button type="submit" class="btn primary tiny">OK</button>
+        <button type="button" class="btn ghost tiny" data-action="rename-cancel">✕</button>
+      </form>
+    </div>
+    <p class="muted">{{ rows|length }} version{{ "s" if rows|length > 1 else "" }} · créé le {{ project.created|replace("T", " ") }}{% if project.seed is not none %} · seed du projet <span class="mono">{{ project.seed }}</span>{% endif %} · {{ project.turns|selectattr("role", "equalto", "user")|list|length }} message{{ "s" if (project.turns|selectattr("role", "equalto", "user")|list|length) > 1 else "" }} échangés</p>
+  </div>
+  <div class="row gap">
+    {% if rows %}<a class="btn primary" href="/studio#project={{ project.id }}">✨ Continuer dans le studio</a>{% else %}<a class="btn primary" href="/studio#project={{ project.id }}">✨ Ouvrir dans le studio</a>{% endif %}
+    <button class="btn danger ghost" hx-delete="/projects/{{ project.id }}" hx-confirm="Supprimer le projet « {{ project.name }} » (conversation et frise) ? Les morceaux générés sont conservés dans la bibliothèque." title="Supprime la conversation ; les audios restent">🗑 Projet</button>
+    {% if rows %}<button class="btn danger ghost" hx-delete="/projects/{{ project.id }}?with_jobs=1" hx-confirm="Supprimer le projet « {{ project.name }} » ET ses {{ rows|length }} version(s) audio ? Cette action est définitive." title="Supprime aussi tous les morceaux du projet">🗑 Projet + audios</button>{% endif %}
+  </div>
+</section>
+
+{% if audible|length >= 2 %}
+<section class="ab panel" data-ab>
+  <div class="panel-head"><h2>Écoute A / B</h2><span class="muted small">Même position de lecture, bascule instantanée. Barre espace : lecture / pause. A / B : bascule.</span></div>
+  <div class="ab-row">
+    {% for side in ("A", "B") %}
+    <label class="ab-side">
+      <span class="ab-letter">{{ side }}</span>
+      <select class="inline" data-ab-select="{{ side }}">
+        {% for r in audible %}<option value="/jobs/{{ r.job.id }}/file/audio.flac" data-label="v{{ r.version.number }} · {{ r.job.name }}" {% if (side == "A" and loop.index == audible|length - 1) or (side == "B" and loop.last) %}selected{% endif %}>v{{ r.version.number }} · {{ r.job.name }}{% if r.job.summary.audio_seconds %} · {{ r.job.summary.audio_seconds|duration }}{% endif %}</option>{% endfor %}
+      </select>
+    </label>
+    {% endfor %}
+    <button type="button" class="btn" data-ab-toggle title="Basculer l'écoute (touche A ou B)">Écouter <strong data-ab-current>A</strong></button>
+    <button type="button" class="btn primary round" data-ab-play aria-label="Lecture / pause">▶</button>
+    <span class="mono time" data-ab-time>0:00</span>
+  </div>
+  <div class="ab-waves"><div data-ab-wave="A" class="ab-wave active"></div><div data-ab-wave="B" class="ab-wave"></div></div>
+</section>
+{% endif %}
+
+<section class="timeline">
+  {% for r in rows|reverse %}
+  {% set job = r.job %}
+  <article class="version card-wide {% if job and job.status == 'running' %}running{% endif %}" data-job="{{ job.id if job else '' }}" {% if r.has_audio %}data-audio="/jobs/{{ job.id }}/file/audio.flac" data-name="v{{ r.version.number }} · {{ job.name }}" data-sub="{{ job.request.cot }} · seed {{ job.request.seed }}{% if job.summary.audio_seconds %} · {{ job.summary.audio_seconds|duration }}{% endif %}"{% endif %}>
+    <div class="version-rail"><span class="vnum">v{{ r.version.number }}</span><span class="vline"></span></div>
+    <div class="version-body">
+      <header class="version-head">
+        <div>
+          <strong>{{ job.name if job else "(morceau supprimé)" }}</strong>
+          <span class="muted small">· {{ {"assistant": "proposition de l'assistant", "manual": "retouche manuelle", "import": "morceau importé"}[r.version.source] }} · {{ r.version.created|replace("T", " ") }}</span>
+        </div>
+        {% if job %}{{ m.status_pill(job) }}{% endif %}
+      </header>
+      <p class="version-summary">{{ r.summary }}{% if r.version.outcome and r.version.outcome.audio_seconds %} · <span class="mono">{{ r.version.outcome.audio_seconds|duration }}</span>{% if r.version.outcome.planned_bars %} pour {{ r.version.outcome.planned_bars }} mesures à {{ r.version.outcome.planned_bpm }} BPM{% endif %}{% endif %}{% if r.version.outcome and (r.version.outcome.truncated or {}).abc or (r.version.outcome.truncated or {}).semantic %} · <span class="warn">tronquée</span>{% endif %}</p>
+      {% if job %}
+      <div class="row gap">
+        {% if r.has_audio %}<button type="button" class="btn small" data-player="play-card">▶ Écouter</button>{% endif %}
+        <a class="btn ghost small" href="/studio#job={{ job.id }}">Ouvrir</a>
+        {% if r.has_audio %}<a class="btn ghost small" href="/jobs/{{ job.id }}/file/audio.flac" download>⬇ FLAC</a>{% endif %}
+        {% if not loop.last %}<button type="button" class="btn ghost small" hx-get="/projects/{{ project.id }}/diff?a={{ (rows|reverse|list)[loop.index].version.number }}&b={{ r.version.number }}" hx-target="#diff-{{ r.version.number }}" hx-swap="innerHTML">⇄ Différences avec v{{ (rows|reverse|list)[loop.index].version.number }}</button>{% endif %}
+      </div>
+      <details class="version-request"><summary class="muted small">Style et paroles de cette version</summary>
+        <p class="prose small">{{ job.request.style }}</p>
+        <pre class="lyrics">{{ job.request.lyrics }}</pre>
+      </details>
+      <div id="diff-{{ r.version.number }}"></div>
+      {% endif %}
+    </div>
+  </article>
+  {% else %}
+  <div class="empty-state"><p>Aucune version encore : ouvrez le projet dans le studio, appliquez une proposition et générez.</p></div>
+  {% endfor %}
+</section>
+
+<section class="panel conversation">
+  <div class="panel-head"><h2>Conversation</h2><span class="muted small">{{ project.usage.prompt_tokens }} tokens entrée · {{ project.usage.completion_tokens }} tokens sortie</span></div>
+  <div class="chat static">
+    {% for turn in project.turns %}
+      {% if turn.role == "note" %}<div class="msg note"><span>ⓘ {{ turn.text }}</span></div>
+      {% elif turn.error %}<div class="msg assistant"><div class="alert error small">{{ turn.error }}</div></div>
+      {% else %}<div class="msg {{ turn.role }}"><p>{{ turn.text }}</p>{% if turn.proposal %}<p class="muted small">→ proposition « {{ turn.proposal.name }} » · {{ turn.proposal.cot }} · ≈ {{ turn.proposal.estimated_seconds|duration }}</p>{% endif %}</div>{% endif %}
+    {% else %}
+    <p class="muted">Aucun échange pour l'instant.</p>
+    {% endfor %}
+  </div>
+</section>
