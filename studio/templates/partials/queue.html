@@ -65,7 +65,15 @@
     <div class="muted small">Derniers terminés</div>
     <ul>
       {% for job in recent[:4] %}
-      <li><a href="/morceaux/{{ job.id }}">{% if job.summary.has_audio %}▶{% else %}♩{% endif %} {{ job.name }}</a> <span class="muted small">{{ m.kind_label(job) }}{% if job.summary.audio_seconds %} · {{ job.summary.audio_seconds|duration }}{% endif %}</span></li>
+      {% set sub = m.kind_label(job) ~ (" · " ~ job.summary.audio_seconds|duration if job.summary.audio_seconds else "") %}
+      <li class="recent" data-job="{{ job.id }}" data-name="{{ job.name }}" data-sub="{{ sub }}"
+          {% if job.summary.has_audio %}data-audio="/jobs/{{ job.id }}/file/audio.flac"{% endif %}>
+        {% if job.summary.has_audio %}
+        <button type="button" class="btn ghost tiny play" data-player="play-card" title="Écouter « {{ job.name }} » sans quitter la page" aria-label="Écouter {{ job.name }}">▶</button>
+        {% else %}<span class="muted" title="Pas d'audio">♩</span>{% endif %}
+        <a href="/morceaux/{{ job.id }}" title="Ouvrir la fiche">{{ job.name }}</a>
+        <span class="muted small">{{ sub }}</span>
+      </li>
       {% endfor %}
     </ul>
   </div>

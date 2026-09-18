@@ -134,6 +134,20 @@ def test_track_page_lives_under_morceaux(client, engine, fake_runner, make_job, 
     assert f'href="/morceaux/{job.id}"' in client.get("/partials/queue").text
 
 
+
+def test_finished_track_is_playable_without_leaving_composer(client, engine, fake_runner):
+    """En fin de génération, « Derniers terminés » propose une lecture sur place (lecteur global)."""
+    client.post("/jobs", data=dict(BASE, name="ecoute directe"))
+    job = wait_done(engine, next(j.id for j in engine.jobs.values() if j.name == "ecoute directe"))
+    queue = client.get("/partials/queue").text
+    assert "Derniers terminés" in queue
+    assert f'<li class="recent" data-job="{job.id}"' in queue and f'data-name="{job.name}"' in queue
+    assert f'data-audio="/jobs/{job.id}/file/audio.flac"' in queue and 'data-player="play-card"' in queue
+    assert f'href="/morceaux/{job.id}"' in queue                     # le nom reste un lien vers la fiche
+    # le lecteur global n'est plus réservé à la galerie : il est dans le gabarit commun
+    for url in ("/studio", "/", f"/morceaux/{job.id}", "/"):
+        assert 'id="global-player"' in client.get(url).text
+
 SCORE = "X:1\nM:4/4\nQ:1/4=90\nK:C\nV: Vocal\nC4|D4|E4|F4|\n"
 
 

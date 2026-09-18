@@ -455,7 +455,9 @@
   // ------------------------------------------------------------------ lecteur global (page Morceaux)
   const gp = { wave: null, card: null };
   function gpEl(role) { return $(`#global-player [data-player="${role}"]`); }
-  function gpCards() { return $$(".card[data-audio], .version[data-audio]"); }
+  const PLAYABLE = ".card[data-audio], .version[data-audio], .recent[data-audio]";
+  // Les listes cachées par CSS (ex. « Derniers terminés » sur la page Morceaux) ne comptent pas dans ⏮/⏭.
+  function gpCards() { return $$(PLAYABLE).filter(el => el.offsetParent !== null); }
   function gpFmt(s) { return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`; }
 
   function gpLoad(card, autoplay = true) {
@@ -489,6 +491,15 @@
     const index = Math.max(0, cards.indexOf(gp.card));
     const next = cards[(index + delta + cards.length) % cards.length];
     gpLoad(next, true);
+  }
+  // Un swap HTMX remplace le noeud du morceau en lecture : on le retrouve par son id pour garder le surlignage.
+  function gpRelink(root) {
+    if (!gp.card) return;
+    const again = $(`[data-job="${gp.card.dataset.job}"][data-audio]`, root);
+    if (!again || again === gp.card) return;
+    gp.card = again;
+    again.classList.add("playing");
+    if (gp.wave && gp.wave.isPlaying()) again.classList.add("is-playing");
   }
   function gpToggle() {
     if (gp.wave) gp.wave.playPause();
@@ -567,7 +578,7 @@
     const p = ev.target.closest("[data-player]");
     if (p) {
       const role = p.dataset.player;
-      if (role === "play-card") { const card = p.closest(".card, .version"); if (gp.card === card && gp.wave) gp.wave.playPause(); else gpLoad(card, true); return; }
+      if (role === "play-card") { const card = p.closest(".card, .version, .recent"); if (gp.card === card && gp.wave) gp.wave.playPause(); else gpLoad(card, true); return; }
       if (role === "toggle") { gpToggle(); return; }
       if (role === "prev") { gpStep(-1); return; }
       if (role === "next") { gpStep(1); return; }
@@ -716,6 +727,7 @@
     if (target.id === "queue") {
       const live = $('[data-role="live-abc"]', target);
       if (live) live.scrollTop = live.scrollHeight;
+      gpRelink(target);
     }
     if (target.id === "library") {
       const id = $(".detail")?.dataset.job;
@@ -723,10 +735,7 @@
     }
     if (target.id === "project") { abInit(target); renderAbcBlocks(target); }
     if (target.id === "assistant-body") { scrollChat(); const ta = $("textarea", target); if (ta && !ta.disabled && !$("#assistant-drawer").hidden) ta.focus(); }
-    if (target.id === "gallery" && gp.card) {
-      const again = $(`.card[data-job="${gp.card.dataset.job}"]`, target);
-      if (again) { gp.card = again; again.classList.add("playing"); if (gp.wave && gp.wave.isPlaying()) again.classList.add("is-playing"); }
-    }
+    if (target.id === "gallery") gpRelink(target);
   });
   document.addEventListener("htmx:beforeRequest", ev => {
     if (ev.detail.elt && ev.detail.elt.matches && ev.detail.elt.matches(".composer")) {

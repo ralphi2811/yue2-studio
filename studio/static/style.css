@@ -96,7 +96,9 @@ code { font-family: var(--mono); font-size: 12px; background: var(--bg-elev-2); 
 .layout-browse .panel-library { position: sticky; top: 64px; max-height: calc(100vh - 84px); overflow: auto; }
 .queue-recent { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
 .queue-recent ul { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.queue-recent li { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-size: 13px; }
+.queue-recent li { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+.queue-recent li .play { padding: 2px 7px; line-height: 1; }
+.queue-recent li.playing > a, .queue-recent li.playing .play { color: var(--accent); }
 .page-landing .queue-recent { display: none; }
 .eyebrow-link { font-size: 12px; color: var(--fg-muted); }
 .eyebrow-link:hover { color: var(--fg); }
@@ -357,6 +359,10 @@ form.rename input { padding: 5px 8px; font-size: 13px; }
   border-top: 1px solid var(--line-strong); box-shadow: 0 -10px 30px rgba(0,0,0,.25);
 }
 .global-player[hidden] { display: none; }
+/* Le lecteur est fixé en bas : on libère la place pour ne rien masquer. */
+body.has-player { padding-bottom: 76px; }
+body.has-player .layout-compose .panel-queue,
+body.has-player .layout-browse .panel-library { max-height: calc(100vh - 156px); }
 .gp-meta { display: flex; flex-direction: column; min-width: 160px; max-width: 260px; }
 .gp-meta strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gp-wave { flex: 1; min-width: 120px; }
