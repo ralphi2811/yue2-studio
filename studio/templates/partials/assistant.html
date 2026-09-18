@@ -1,24 +1,28 @@
-{# Panneau de l'assistant : sélecteur de projet, conversation, composeur. Rendu complet à chaque tour. #}
-<div class="assistant" data-project="{{ project.id if project else '' }}">
+{# Panneau de l'assistant : il suit le morceau ouvert (conversation de son projet), conversation, composeur. Rendu complet à chaque tour. #}
+<div class="assistant" data-project="{{ project.id if project else '' }}" data-job="{{ context_job.id if context_job else '' }}">
   <div class="panel-head">
     <h2>✨ Assistant</h2>
-    <select class="inline project-select" title="Projet en cours : conversation + versions" hx-get="/assistant/panel" hx-target="#assistant-body" hx-swap="innerHTML" hx-trigger="change" name="project_id">
-      <option value="" {% if not project %}selected{% endif %}>— choisir un projet —</option>
-      {% for p in projects %}<option value="{{ p.id }}" {% if project and p.id == project.id %}selected{% endif %}>{{ p.name }}{% if p.versions %} · v{{ p.latest.number }}{% endif %}</option>{% endfor %}
-    </select>
-    <button type="button" class="btn ghost tiny" hx-post="/assistant/reset" hx-target="#assistant-body" hx-swap="innerHTML" title="Nouveau projet vierge (celui-ci reste dans la liste)">＋</button>
+    <span class="assistant-context" title="{{ 'Projet suivi : la conversation et les versions de ce morceau' if project else 'Aucun projet ouvert' }}">{% if project %}{{ project.name }}{% elif context_job %}<span class="muted">{{ context_job.name }}</span>{% else %}<span class="muted">nouvelle conversation</span>{% endif %}</span>
+    <button type="button" class="btn ghost tiny" hx-post="/assistant/reset" hx-target="#assistant-body" hx-swap="innerHTML" title="Nouvelle conversation dans un projet vierge (celle-ci reste accessible depuis ses morceaux)">＋</button>
     <button type="button" class="btn ghost tiny" data-action="close-assistant" title="Replier l'assistant (le bouton ✨ Assistant le rouvre)">✕</button>
   </div>
   <div class="assistant-sub muted small">
     {% if project %}
-      <span>{{ project.name }}</span>
-      {% if project.versions %} · {{ project.versions|length }} version{{ "s" if project.versions|length > 1 else "" }} · <a href="/projects/{{ project.id }}">frise</a>{% endif %}
+      {% if project.versions %}<span>{{ project.versions|length }} version{{ "s" if project.versions|length > 1 else "" }}</span> · <a href="/projects/{{ project.id }}">frise</a>{% else %}<span>aucune version encore</span>{% endif %}
       {% if project.seed is not none %} · seed <span class="mono">{{ project.seed }}</span>{% endif %}
+    {% elif context_job %}
+      <span>Morceau hors projet : pas de conversation associée.</span>
     {% else %}
-      <span>Aucun projet ouvert : le premier message en créera un.</span>
+      <span>Le premier message créera un projet.</span>
     {% endif %}
     <span class="right">{{ settings.model if settings.ready else "LLM non configuré" }}</span>
   </div>
+  {% if context_job and not project %}
+  <div class="alert info small row gap">
+    <span>Pour retravailler « {{ context_job.name }} » avec l'assistant, faites-en la v1 d'un projet : la conversation partira de son style, de ses paroles et de ses réglages.</span>
+    <button type="button" class="btn primary small" hx-post="/projects/from-job/{{ context_job.id }}" hx-target="#assistant-body" hx-swap="innerHTML">✨ Retravailler ce morceau</button>
+  </div>
+  {% endif %}
 
   {% if not settings.ready %}
   <div class="alert info small">Configurez d'abord le connecteur LLM : <button type="button" class="btn ghost tiny" data-action="open-settings">⚙︎ Moteur → Assistant LLM</button>. N'importe quel service OpenAI-compatible fonctionne : OpenRouter, OpenAI, Mistral, ou en local Ollama, LM Studio, vLLM.</div>

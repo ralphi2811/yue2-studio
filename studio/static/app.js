@@ -357,6 +357,19 @@
   }
 
   // ------------------------------------------------------------------ assistant LLM
+  // Fait suivre à l'assistant le morceau ouvert (job_id) ou le projet du formulaire (project_id),
+  // sans écraser un message en cours de frappe.
+  function syncAssistant(query, want) {
+    const body = $("#assistant-body");
+    if (!body || !window.htmx) return;
+    const cur = $(".assistant", body);
+    if (cur && want.project && cur.dataset.project === want.project) return;
+    if (cur && !want.project && want.job && cur.dataset.job === want.job) return;
+    const ta = $("textarea", body);
+    if (ta && ta.value.trim()) return;
+    htmx.ajax("GET", `/assistant/panel?${query}`, { target: "#assistant-body", swap: "innerHTML" });
+  }
+
   function setAssistantOpen(open) {
     const drawer = $("#assistant-drawer");
     if (!drawer) return;
@@ -669,11 +682,18 @@
   document.addEventListener("htmx:afterSwap", ev => {
     const target = (ev.detail && ev.detail.target) || ev.target;
     if (!target || !target.id) return;
-    if (target.id === "form-panel") { setMode("compose"); initForm(target); target.scrollIntoView({ behavior: "smooth", block: "start" }); }
+    if (target.id === "form-panel") {
+      setMode("compose"); initForm(target); target.scrollIntoView({ behavior: "smooth", block: "start" });
+      const pid = $('[name="project_id"]', target)?.value;
+      if (pid) syncAssistant(`project_id=${encodeURIComponent(pid)}`, { project: pid });
+    }
     if (target.id === "detail") {
       initPlayer(target); renderAbcBlocks(target);
-      const id = $(".detail", target)?.dataset.job;
-      if (id) { setMode("browse"); $$(".track").forEach(x => x.classList.toggle("selected", x.dataset.job === id)); }
+      const d = $(".detail", target), id = d?.dataset.job;
+      if (id) {
+        setMode("browse"); $$(".track").forEach(x => x.classList.toggle("selected", x.dataset.job === id));
+        syncAssistant(`job_id=${encodeURIComponent(id)}`, { project: d.dataset.project || "", job: id });
+      }
       if (!$(".detail", target)) target.innerHTML = '<p>Sélectionnez un morceau dans la bibliothèque.</p>';
       target.classList.toggle("detail-empty", !$(".detail", target));
     }

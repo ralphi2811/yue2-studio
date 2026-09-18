@@ -66,6 +66,8 @@ et `YUE2_LLM_MODEL` sans les exporter dans le shell.
   **Écouter** masque le formulaire, place la bibliothèque à gauche et la fiche du morceau en pleine largeur. Cliquer un morceau
   passe en Écouter ; « Réutiliser », « Variation », « Éditer la partition » ou « Appliquer au formulaire » ramènent en Composer,
   et le titre du formulaire indique l'origine des valeurs (« Nouvelle version de… », « Variation de… », etc.).
+  L'assistant suit le morceau ouvert : il affiche la conversation de son projet, ou propose d'en faire la v1 d'un projet s'il
+  n'en a pas. La comparaison de mélodies ne propose que les versions du même projet et les morceaux partageant la partition.
 - **Bibliothèque** : lecteur avec forme d'onde, téléchargement FLAC / WAV, partition rendue en portée + source ABC,
   requête, réglages effectifs (`config.json`), temps par étape, liste des fichiers.
 - **Outils de partition** (onglet Partition, et dans le détail d'un morceau) : validation stricte par le vérificateur du skill

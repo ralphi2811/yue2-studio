@@ -1,5 +1,5 @@
 {% import "macros.html" as m %}
-<article class="detail" data-job="{{ job.id }}">
+<article class="detail" data-job="{{ job.id }}" data-project="{{ project.id if project else '' }}">
   <div class="detail-bar">
     <span class="eyebrow">Morceau sélectionné <span class="muted">· depuis la bibliothèque</span></span>
     <button type="button" class="btn ghost tiny" data-action="close-detail" title="Refermer la fiche (le morceau reste dans la bibliothèque)">✕ fermer</button>
@@ -90,9 +90,9 @@
     {% if score_jobs %}
     <form class="compare-row" hx-post="/abc/compare" hx-target="#d-abc-check" hx-swap="innerHTML">
       <input type="hidden" name="after_job" value="{{ job.id }}">
-      <span class="muted small">Comparer la mélodie avec :</span>
+      <span class="muted small" title="Seules les versions du même projet et les morceaux partageant cette partition sont proposés">Comparer la mélodie avec :</span>
       <select name="before_job" class="inline">
-        {% for other in score_jobs %}<option value="{{ other.id }}">{{ other.name }} · {{ other.created|replace("T", " ") }}</option>{% endfor %}
+        {% for other, label in score_jobs %}<option value="{{ other.id }}">{{ label }} · {{ other.name }} · {{ other.created|replace("T", " ")|truncate(16, true, "") }}</option>{% endfor %}
       </select>
       <select name="voices" class="inline"><option value="both">Vocal + Ins</option><option value="Vocal">Vocal</option><option value="Ins">Ins</option></select>
       <label class="muted small"><input type="checkbox" name="allow_tempo_change" value="1"> tempo libre</label>

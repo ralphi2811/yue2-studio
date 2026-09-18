@@ -97,6 +97,49 @@ def test_form_title_reflects_origin_and_detail_has_close_bar(client, engine, fak
     assert "Morceau sélectionné" in detail and 'data-action="close-detail"' in detail
 
 
+SCORE = "X:1\nM:4/4\nQ:1/4=90\nK:C\nV: Vocal\nC4|D4|E4|F4|\n"
+
+
+def test_assistant_panel_follows_the_open_track(client, make_job, store, monkeypatch):
+    monkeypatch.setattr(A, "_STORE", store)
+    project = store.create("mon_projet")
+    linked = make_job("liee", score=SCORE)
+    store.add_version(project, linked.id)
+    loose = make_job("libre", score=SCORE)
+    # morceau d'un projet → conversation du projet, sans sélecteur de projet
+    r = client.get(f"/assistant/panel?job_id={linked.id}")
+    assert r.status_code == 200 and f'data-project="{project.id}"' in r.text and "mon_projet" in r.text
+    assert "choisir un projet" not in r.text and "project-select" not in r.text
+    # morceau hors projet → contexte + bouton pour en faire la v1 d'un projet
+    r = client.get(f"/assistant/panel?job_id={loose.id}")
+    assert r.status_code == 200 and 'data-project=""' in r.text and f'data-job="{loose.id}"' in r.text
+    assert "hors projet" in r.text and f"/projects/from-job/{loose.id}" in r.text
+    assert client.get("/assistant/panel?job_id=nope").status_code == 404
+    # la fiche annonce son projet pour que le tiroir puisse le suivre
+    assert f'data-project="{project.id}"' in client.get(f"/jobs/{linked.id}").text
+    assert 'data-project=""' in client.get(f"/jobs/{loose.id}").text
+
+
+def test_compare_candidates_are_limited_to_related_tracks(client, make_job, store, monkeypatch):
+    monkeypatch.setattr(A, "_STORE", store)
+    project = store.create("proj")
+    v1 = make_job("v_un", score=SCORE)
+    v2 = make_job("v_deux", score=SCORE)
+    store.add_version(project, v1.id)
+    store.add_version(project, v2.id)
+    stranger = make_job("etranger", score=SCORE)
+    edited = make_job("v_un_edit", score=SCORE)
+    edited.source_job = v1.id
+    edited.persist()
+    text = client.get(f"/jobs/{v1.id}").text
+    assert f'value="{v2.id}"' in text and "v2 · v_deux" in text            # autre version du projet
+    assert f'value="{edited.id}"' in text and "reprend cette partition" in text
+    assert stranger.id not in text                                          # aucun lien : pas proposé
+    text = client.get(f"/jobs/{edited.id}").text
+    assert f'value="{v1.id}"' in text and "partition d&#39;origine" in text   # (échappement HTML de l'apostrophe)
+    assert client.get(f"/jobs/{stranger.id}").text.count("compare-row") == 0   # rien de comparable
+
+
 def test_form_origin_labels():
     from studio.app import form_origin
 

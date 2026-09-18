@@ -185,7 +185,8 @@ def parse_job_form(form) -> Job:
     return Job(id=engine.new_job_id(name), name=name, kind=kind, request=request,
                abc_sampling=abc_s, semantic_sampling=sem_s, ode_steps=int(values["ode_steps"]), project_id=project_id,
                max_seconds=int(values["max_duration"]) if values.get("max_duration") is not None else None,
-               plan_overflow=values.get("plan_overflow") or "auto")
+               plan_overflow=values.get("plan_overflow") or "auto",
+               source_job=(form.get("source_job") or "").strip() or None)
 
 
 def parse_settings_form(form) -> EngineSettings:
@@ -429,6 +430,29 @@ async def decode_job(request: Request, job_id: str, vae: str = "legacy"):
 from .guard import abc_duration  # noqa: E402  (réexport : utilisé par les routes et les tests)
 
 
+def related_score_jobs(job: Job, project=None) -> list[tuple[Job, str]]:
+    """Morceaux comparables à ``job`` : les autres versions de son projet et sa lignée de partition
+    (le job dont il reprend la partition, ceux qui reprennent la sienne ou la même source). Jamais un morceau sans lien."""
+    engine = get_engine()
+    labels: dict[str, str] = {}
+    if project is not None:
+        for v in project.versions:
+            if v.job_id != job.id:
+                labels[v.job_id] = f"v{v.number}"
+    if job.source_job and job.source_job != job.id:
+        labels.setdefault(job.source_job, "partition d'origine")
+    for other in engine.jobs.values():
+        if other.id == job.id or not other.source_job:
+            continue
+        if other.source_job == job.id:
+            labels.setdefault(other.id, "reprend cette partition")
+        elif job.source_job and other.source_job == job.source_job:
+            labels.setdefault(other.id, "même partition d'origine")
+    out = [(engine.jobs[i], lab) for i, lab in labels.items() if i in engine.jobs and (engine.jobs[i].output_dir / "score.abc").is_file()]
+    out.sort(key=lambda t: t[0].created, reverse=True)
+    return out
+
+
 def detail_ctx(job: Job) -> dict:
     d = job.output_dir
     files = sorted(p.name for p in d.iterdir()) if d.is_dir() else []
@@ -437,9 +461,8 @@ def detail_ctx(job: Job) -> dict:
     config = json.loads((d / "config.json").read_text()) if (d / "config.json").is_file() else None
     trace = (d / "traceback.txt").read_text() if (d / "traceback.txt").is_file() else None
     engine = get_engine()
-    score_jobs = [j for j in engine.jobs.values() if j.id != job.id and (j.output_dir / "score.abc").is_file()]
-    score_jobs.sort(key=lambda j: j.created, reverse=True)
     found = A.store().for_job(job.id)
+    score_jobs = related_score_jobs(job, found[0] if found else None)
     return {"files": files, "score": score, "result": result, "config": config, "trace": trace,
             "planned": abc_duration(score) if score else None,
             "project": found[0] if found else None, "project_version": found[1] if found else None,
@@ -729,13 +752,22 @@ async def abc_compare(request: Request):
 # --------------------------------------------------------------------------
 # Assistant de composition (LLM OpenAI-compatible)
 # --------------------------------------------------------------------------
-def _assistant_html(request: Request, project: PR.Project | None) -> str:
-    return render("partials/assistant.html", request, project=project, settings=llm.get_settings(),
-                  projects=A.store().all()[:20])
+def _assistant_html(request: Request, project: PR.Project | None, context_job: Job | None = None) -> str:
+    return render("partials/assistant.html", request, project=project, settings=llm.get_settings(), context_job=context_job)
 
 
 @app.get("/assistant/panel", response_class=HTMLResponse)
-async def assistant_panel(request: Request, project_id: str | None = None):
+async def assistant_panel(request: Request, project_id: str | None = None, job_id: str | None = None):
+    """Panneau de l'assistant. Avec ``job_id``, il suit le morceau ouvert : la conversation de son projet,
+    ou un contexte « hors projet » proposant de le retravailler."""
+    if job_id:
+        job = get_engine().jobs.get(job_id)
+        if job is None:
+            raise HTTPException(404)
+        found = A.store().for_job(job.id)
+        if found:
+            return HTMLResponse(_assistant_html(request, found[0]))
+        return HTMLResponse(_assistant_html(request, None, context_job=job))
     return HTMLResponse(_assistant_html(request, A.store().get(project_id)))
 
 

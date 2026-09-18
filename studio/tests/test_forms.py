@@ -142,6 +142,11 @@ def test_parse_job_form_plan_overflow():
     assert A._row_to_form({"plan_overflow": "stop"}, {})["plan_overflow"] == "stop"
 
 
+def test_parse_job_form_keeps_source_job_for_lineage():
+    assert A.parse_job_form(dict(BASE)).source_job is None
+    assert A.parse_job_form(dict(BASE, source_job=" abc-123 ")).source_job == "abc-123"
+
+
 # ---------------------------------------------------------------- .env
 def test_load_env_file_sets_missing_variables_only(tmp_path, monkeypatch):
     from studio.paths import load_env_file
