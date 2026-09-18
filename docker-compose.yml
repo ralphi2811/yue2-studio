@@ -1,7 +1,8 @@
 # YuE2 Studio — hébergement conteneurisé sur une machine avec GPU NVIDIA (24 Go de VRAM recommandés).
 # Prérequis hôte : pilote NVIDIA + nvidia-container-toolkit (https://docs.nvidia.com/datacenter/cloud-native/).
 #
-#   YUE2_LLM_API_KEY=sk-... docker compose up -d        # clé optionnelle : assistant de composition
+#   cp .env.example .env    # puis renseignez YUE2_LLM_API_KEY (optionnelle : assistant de composition)
+#   docker compose up -d    # Compose lit le .env automatiquement
 #   docker compose logs -f studio
 #
 # ⚠ Le studio n'a AUCUNE authentification : il est pensé pour un usage local ou un réseau privé.

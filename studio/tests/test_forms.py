@@ -140,3 +140,21 @@ def test_parse_job_form_plan_overflow():
     with pytest.raises(A.FormError):
         A.parse_job_form(dict(BASE, plan_overflow="maybe"))
     assert A._row_to_form({"plan_overflow": "stop"}, {})["plan_overflow"] == "stop"
+
+
+# ---------------------------------------------------------------- .env
+def test_load_env_file_sets_missing_variables_only(tmp_path, monkeypatch):
+    from studio.paths import load_env_file
+    env = tmp_path / ".env"
+    env.write_text('# commentaire\nYUE2_TEST_A=un\nexport YUE2_TEST_B="deux mots"\nYUE2_TEST_C=\'trois\'\nSANS_EGAL\n\nYUE2_TEST_D=\n', encoding="utf-8")
+    for k in ("YUE2_TEST_A", "YUE2_TEST_B", "YUE2_TEST_C", "YUE2_TEST_D"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("YUE2_TEST_A", "déjà là")
+    loaded = load_env_file(env)
+    assert loaded == ["YUE2_TEST_B", "YUE2_TEST_C", "YUE2_TEST_D"]
+    import os
+    assert os.environ["YUE2_TEST_A"] == "déjà là" and os.environ["YUE2_TEST_B"] == "deux mots"
+    assert os.environ["YUE2_TEST_C"] == "trois" and os.environ["YUE2_TEST_D"] == ""
+    assert load_env_file(env, override=True) == ["YUE2_TEST_A", "YUE2_TEST_B", "YUE2_TEST_C", "YUE2_TEST_D"]
+    assert os.environ["YUE2_TEST_A"] == "un"
+    assert load_env_file(tmp_path / "absent.env") == []

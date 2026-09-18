@@ -12,7 +12,8 @@ Depuis la racine du dépôt (le venv doit contenir `yue2-infer`, `fastapi`, `uvi
 ```
 
 Puis ouvrir <http://127.0.0.1:8420>. Ajoute `--host 0.0.0.0` pour y accéder depuis une autre machine du réseau local.
-`--reload` recharge le code à chaud pendant le développement.
+`--reload` recharge le code à chaud pendant le développement. Au démarrage, le studio charge un éventuel `.env` à la racine
+du dépôt (voir `.env.example`, même fichier que pour Docker Compose) : pratique pour `YUE2_LLM_API_KEY` sans l'exporter dans le shell.
 
 ## Ce que fait l'interface
 
@@ -100,14 +101,14 @@ un GPU avec 24 Go de VRAM (BF16). Les modèles ne sont pas dans l'image : ils se
 chargement du moteur (≈ 7,3 Go) dans le volume `models`, puis restent en cache.
 
 ```bash
-# image publiée
-YUE2_LLM_API_KEY=sk-... docker compose up -d          # la clé est optionnelle (assistant de composition)
-# ou construction locale
-docker compose up -d --build
+cp .env.example .env          # renseignez YUE2_LLM_API_KEY si vous voulez l'assistant (fichier ignoré par git)
+docker compose up -d          # image publiée ; Compose lit le .env automatiquement
+docker compose up -d --build  # ou construction locale
 ```
 
 Volumes : `models` (cache Hugging Face), `outputs` (morceaux et projets), `data` (réglages du moteur et de l'assistant).
-Variables : `YUE2_STUDIO_PORT` (défaut 8420), `YUE2_LLM_API_KEY`, `HF_TOKEN` (inutile pour les modèles publics).
+Variables du `.env` (voir `.env.example`) : `YUE2_LLM_API_KEY`, `YUE2_STUDIO_PORT` (défaut 8420), `HF_TOKEN` (inutile pour les
+modèles publics). La clé peut aussi être saisie dans l'interface (⚙︎ Moteur → Assistant LLM) ; elle est alors stockée dans le volume `data`.
 
 > **Aucune authentification n'est intégrée.** Le studio est pensé pour un poste local ou un réseau privé : toute personne qui
 > atteint le port peut lancer des générations sur le GPU et consommer la clé LLM. Pour l'exposer, placez une identification en
