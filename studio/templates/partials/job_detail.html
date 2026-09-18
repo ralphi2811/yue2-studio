@@ -1,8 +1,8 @@
 {% import "macros.html" as m %}
 <article class="detail" data-job="{{ job.id }}" data-project="{{ project.id if project else '' }}">
   <div class="detail-bar">
-    <span class="eyebrow">Morceau sélectionné <span class="muted">· depuis la bibliothèque</span></span>
-    <button type="button" class="btn ghost tiny" data-action="close-detail" title="Refermer la fiche (le morceau reste dans la bibliothèque)">✕ fermer</button>
+    <a class="eyebrow-link" href="/" title="Retour à la galerie">← Tous les morceaux</a>
+    <span class="eyebrow">Morceau{% if project %} <span class="muted">· projet « {{ project.name }} »{% if job.version %} · v{{ job.version }}{% endif %}</span>{% endif %}</span>
   </div>
   <header class="detail-head">
     <div>
@@ -45,9 +45,9 @@
   {% endif %}
 
   <div class="actions">
-    <button class="btn" hx-get="/partials/form?from_job={{ job.id }}&mode=reuse" hx-target="#form-panel" hx-swap="innerHTML" title="Recharge tous les réglages de ce job dans le formulaire">↺ Réutiliser les réglages</button>
-    <button class="btn" hx-get="/partials/form?from_job={{ job.id }}&mode=variation" hx-target="#form-panel" hx-swap="innerHTML" title="Mêmes réglages, nouvelle graine">🎲 Variation</button>
-    {% if score %}<button class="btn" hx-get="/partials/form?from_job={{ job.id }}&mode=edit-score" hx-target="#form-panel" hx-swap="innerHTML" title="Charge la partition dans le formulaire pour la modifier puis la re-rendre">✎ Éditer la partition</button>{% endif %}
+    <a class="btn" href="/studio?from_job={{ job.id }}&mode=reuse" title="Ouvre Composer avec tous les réglages de ce morceau">↺ Réutiliser les réglages</a>
+    <a class="btn" href="/studio?from_job={{ job.id }}&mode=variation" title="Ouvre Composer avec les mêmes réglages et une nouvelle graine">🎲 Variation</a>
+    {% if score %}<a class="btn" href="/studio?from_job={{ job.id }}&mode=edit-score" title="Ouvre Composer avec la partition à modifier puis re-rendre">✎ Éditer la partition</a>{% endif %}
     {% if has_latents %}
       {% for choice in ("standard", "legacy") if choice != job.summary.vae %}
       <button class="btn ghost" hx-post="/jobs/{{ job.id }}/decode?vae={{ choice }}" hx-target="#detail" hx-swap="innerHTML" title="Décode les mêmes latents avec ce décodeur, sans régénérer la musique">🔁 Re-décoder · VAE {{ choice }}</button>

@@ -58,4 +58,16 @@
     {% endfor %}
   </ul>
   {% endif %}
+
+  {% set recent = history|selectattr("status", "equalto", "done")|list %}
+  {% if recent %}
+  <div class="queue-recent">
+    <div class="muted small">Derniers terminés</div>
+    <ul>
+      {% for job in recent[:4] %}
+      <li><a href="/morceaux/{{ job.id }}">{% if job.summary.has_audio %}▶{% else %}♩{% endif %} {{ job.name }}</a> <span class="muted small">{{ m.kind_label(job) }}{% if job.summary.audio_seconds %} · {{ job.summary.audio_seconds|duration }}{% endif %}</span></li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
 </div>

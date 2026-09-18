@@ -12,7 +12,7 @@
     <p class="muted">{{ rows|length }} version{{ "s" if rows|length > 1 else "" }} · créé le {{ project.created|replace("T", " ") }}{% if project.seed is not none %} · seed du projet <span class="mono">{{ project.seed }}</span>{% endif %} · {{ project.turns|selectattr("role", "equalto", "user")|list|length }} message{{ "s" if (project.turns|selectattr("role", "equalto", "user")|list|length) > 1 else "" }} échangés</p>
   </div>
   <div class="row gap">
-    {% if rows %}<a class="btn primary" href="/studio#project={{ project.id }}">✨ Continuer dans le studio</a>{% else %}<a class="btn primary" href="/studio#project={{ project.id }}">✨ Ouvrir dans le studio</a>{% endif %}
+    {% if rows %}<a class="btn primary" href="/studio#project={{ project.id }}">✨ Continuer dans Composer</a>{% else %}<a class="btn primary" href="/studio#project={{ project.id }}">✨ Ouvrir dans Composer</a>{% endif %}
     <button class="btn danger ghost" hx-delete="/projects/{{ project.id }}" hx-confirm="Supprimer le projet « {{ project.name }} » (conversation et frise) ? Les morceaux générés sont conservés dans la bibliothèque." title="Supprime la conversation ; les audios restent">🗑 Projet</button>
     {% if rows %}<button class="btn danger ghost" hx-delete="/projects/{{ project.id }}?with_jobs=1" hx-confirm="Supprimer le projet « {{ project.name }} » ET ses {{ rows|length }} version(s) audio ? Cette action est définitive." title="Supprime aussi tous les morceaux du projet">🗑 Projet + audios</button>{% endif %}
   </div>
@@ -55,7 +55,7 @@
       {% if job %}
       <div class="row gap">
         {% if r.has_audio %}<button type="button" class="btn small" data-player="play-card">▶ Écouter</button>{% endif %}
-        <a class="btn ghost small" href="/studio#job={{ job.id }}">Ouvrir</a>
+        <a class="btn ghost small" href="/morceaux/{{ job.id }}">Ouvrir</a>
         {% if r.has_audio %}<a class="btn ghost small" href="/jobs/{{ job.id }}/file/audio.flac" download>⬇ FLAC</a>{% endif %}
         {% if not loop.last %}<button type="button" class="btn ghost small" hx-get="/projects/{{ project.id }}/diff?a={{ (rows|reverse|list)[loop.index].version.number }}&b={{ r.version.number }}" hx-target="#diff-{{ r.version.number }}" hx-swap="innerHTML">⇄ Différences avec v{{ (rows|reverse|list)[loop.index].version.number }}</button>{% endif %}
       </div>

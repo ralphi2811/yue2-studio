@@ -35,7 +35,7 @@
       <a class="btn ghost small" href="/projects/{{ project.id }}" title="Frise des versions et conversation">Versions</a>
       <a class="btn ghost small" href="/studio#project={{ project.id }}" title="Continuer avec l'assistant">✨</a>
       {% else %}
-      <a class="btn ghost small" href="/studio#job={{ job.id }}">Ouvrir</a>
+      <a class="btn ghost small" href="/morceaux/{{ job.id }}">Ouvrir</a>
       {% if has_audio %}<button class="btn ghost small" hx-post="/projects/from-job/{{ job.id }}?target=page" title="Retravailler avec l'assistant : crée un projet dont ce morceau est la v1">✨</button>{% endif %}
       {% endif %}
       {% if has_audio %}<a class="btn ghost small" href="/jobs/{{ job.id }}/file/audio.flac" download title="Télécharger l'audio (FLAC)">⬇</a>{% endif %}

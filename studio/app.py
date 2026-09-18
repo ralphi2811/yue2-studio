@@ -15,6 +15,7 @@ import re
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
@@ -264,9 +265,41 @@ async def landing(request: Request, q: str = "", sort: str = "recent", all: str 
     return HTMLResponse(render("landing.html", request, **ctx))
 
 
+def _form_values(from_job: str | None, mode: str) -> dict:
+    """Valeurs du formulaire : vierges, ou reprises d'un morceau (réutiliser / variation / partition à retoucher)."""
+    if not from_job:
+        return form_defaults()
+    job = get_engine().jobs.get(from_job)
+    if job is None:
+        raise HTTPException(404)
+    values = job_to_form(job, mode)
+    if (job.output_dir / "score.abc").is_file():
+        values["source_job"] = job.id
+    return values
+
+
 @app.get("/studio", response_class=HTMLResponse)
-async def index(request: Request):
-    return HTMLResponse(render("index.html", request, values=form_defaults(), error=None, **engine_ctx()))
+async def index(request: Request, from_job: str | None = None, mode: str = "reuse", apply: str | None = None):
+    """Page Composer : le formulaire, la file d'attente et l'assistant. ``from_job`` pré-remplit depuis un morceau,
+    ``apply`` applique la dernière proposition d'un projet (bouton de l'assistant depuis la fiche d'un morceau)."""
+    flash, open_tab = None, None
+    if apply:
+        project = A.store().get(apply)
+        if project is None or not project.proposal:
+            raise HTTPException(404, "Aucune proposition à appliquer.")
+        values, flash, open_tab = _apply_proposal(project)
+    else:
+        values = _form_values(from_job, mode)
+    return HTMLResponse(render("index.html", request, values=values, error=None, flash=flash, open_tab=open_tab, **engine_ctx()))
+
+
+@app.get("/morceaux/{job_id}", response_class=HTMLResponse)
+async def track_page(request: Request, job_id: str):
+    """Fiche d'un morceau sous l'onglet Morceaux : bibliothèque à gauche, lecteur / partition / réglages à droite."""
+    job = get_engine().jobs.get(job_id)
+    if job is None:
+        raise HTTPException(404)
+    return HTMLResponse(render("track.html", request, job=job, flash=None, selected_job=job.id, **detail_ctx(job), **engine_ctx()))
 
 
 def gallery_ctx(q: str = "", sort: str = "recent", show_all: bool = False) -> dict:
@@ -329,15 +362,7 @@ async def rename_job(request: Request, job_id: str, view: str = "card"):
 
 @app.get("/partials/form", response_class=HTMLResponse)
 async def partial_form(request: Request, from_job: str | None = None, mode: str = "reuse"):
-    values = form_defaults()
-    if from_job:
-        job = get_engine().jobs.get(from_job)
-        if job is None:
-            raise HTTPException(404)
-        values = job_to_form(job, mode)
-        if (job.output_dir / "score.abc").is_file():
-            values["source_job"] = job.id
-    return HTMLResponse(render("partials/form.html", request, values=values, error=None, flash=None))
+    return HTMLResponse(render("partials/form.html", request, values=_form_values(from_job, mode), error=None, flash=None))
 
 
 @app.get("/partials/queue", response_class=HTMLResponse)
@@ -760,8 +785,18 @@ async def abc_compare(request: Request):
 # --------------------------------------------------------------------------
 # Assistant de composition (LLM OpenAI-compatible)
 # --------------------------------------------------------------------------
+def _on_composer(request: Request | None) -> bool:
+    """Le tiroir de l'assistant est-il affiché sur la page Composer (où le formulaire existe) ?
+    htmx transmet l'URL de la page dans HX-Current-URL ; sans cet en-tête (appel direct), on suppose Composer."""
+    current = request.headers.get("hx-current-url") if request is not None else None
+    if not current:
+        return True
+    return urlparse(current).path.rstrip("/") == "/studio"
+
+
 def _assistant_html(request: Request, project: PR.Project | None, context_job: Job | None = None) -> str:
-    return render("partials/assistant.html", request, project=project, settings=llm.get_settings(), context_job=context_job)
+    return render("partials/assistant.html", request, project=project, settings=llm.get_settings(), context_job=context_job,
+                  on_composer=_on_composer(request))
 
 
 @app.get("/assistant/panel", response_class=HTMLResponse)
@@ -802,10 +837,15 @@ async def assistant_apply(request: Request):
     project = A.store().get(form.get("project_id"))
     if project is None or not project.proposal:
         raise HTTPException(404, "Aucune proposition à appliquer.")
+    values, flash, open_tab = _apply_proposal(project)
+    return HTMLResponse(render("partials/form.html", request, values=values, error=None, flash=flash, open_tab=open_tab))
+
+
+def _apply_proposal(project: PR.Project) -> tuple[dict, str, str]:
     values = A.proposal_to_form(project.proposal, project)
     flash = (f"Proposition « {project.proposal['name']} » appliquée. La prochaine génération deviendra la "
              f"v{project.next_number} du projet « {project.name} ».")
-    return HTMLResponse(render("partials/form.html", request, values=values, error=None, flash=flash, open_tab="song"))
+    return values, flash, "song"
 
 
 @app.post("/assistant/quick")

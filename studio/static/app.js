@@ -377,15 +377,6 @@
 
   function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
-  // ------------------------------------------------------------------ modes Composer / Écouter
-  function setMode(mode, persist = true) {
-    const layout = $("#layout");
-    if (!layout || (mode !== "compose" && mode !== "browse")) return;
-    layout.dataset.mode = mode;
-    $$(".mode-tab").forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
-    if (persist) { try { localStorage.setItem("yue2.mode", mode); } catch (_) {} }
-  }
-
   // ------------------------------------------------------------------ assistant LLM
   // Fait suivre à l'assistant le morceau ouvert (job_id) ou le projet du formulaire (project_id),
   // sans écraser un message en cours de frappe.
@@ -476,7 +467,7 @@
     gp.card = card;
     gpEl("title").textContent = card.dataset.name;
     gpEl("sub").textContent = card.dataset.sub || "";
-    gpEl("open").href = `/studio#job=${card.dataset.job}`;
+    gpEl("open").href = `/morceaux/${card.dataset.job}`;
     gpEl("download").href = card.dataset.audio;
     gpEl("current").textContent = "0:00"; gpEl("total").textContent = "…";
     if (gp.wave) { try { gp.wave.destroy(); } catch (_) {} }
@@ -611,7 +602,6 @@
       case "rename": startRename(t); break;
       case "rename-cancel": cancelRename(t); break;
       case "toggle-assistant": setAssistantOpen($("#assistant-drawer").hidden); break;
-      case "mode": setMode(t.dataset.mode); break;
       case "detach-project": {
         const f = $("#job-form");
         $('[name="project_id"]', f).value = "";
@@ -620,12 +610,6 @@
         const labels = { reuse: "Réglages repris de", variation: "Variation de", "edit-score": "Partition retouchée de" };
         const title = $('[data-role="form-title"]', f);
         if (title) title.textContent = kind === "assistant" ? "Proposition de l'assistant" : (labels[kind] && name ? `${labels[kind]} « ${name} »` : "Nouveau morceau");
-        break;
-      }
-      case "close-detail": {
-        const d = $("#detail");
-        if (d) { d.innerHTML = "<p>Sélectionnez un morceau dans la bibliothèque pour l'écouter, lire sa partition et ses réglages.</p>"; d.classList.add("detail-empty"); }
-        $$(".track.selected").forEach(x => x.classList.remove("selected"));
         break;
       }
       case "close-assistant": setAssistantOpen(false); break;
@@ -716,7 +700,7 @@
     const target = (ev.detail && ev.detail.target) || ev.target;
     if (!target || !target.id) return;
     if (target.id === "form-panel") {
-      setMode("compose"); initForm(target); target.scrollIntoView({ behavior: "smooth", block: "start" });
+      initForm(target); target.scrollIntoView({ behavior: "smooth", block: "start" });
       const pid = $('[name="project_id"]', target)?.value;
       if (pid) syncAssistant(`project_id=${encodeURIComponent(pid)}`, { project: pid });
     }
@@ -724,18 +708,16 @@
       initPlayer(target); renderAbcBlocks(target);
       const d = $(".detail", target), id = d?.dataset.job;
       if (id) {
-        setMode("browse"); $$(".track").forEach(x => x.classList.toggle("selected", x.dataset.job === id));
+        $$(".track").forEach(x => x.classList.toggle("selected", x.dataset.job === id));
         syncAssistant(`job_id=${encodeURIComponent(id)}`, { project: d.dataset.project || "", job: id });
+        document.title = `${$("h2", d)?.firstChild?.textContent.trim() || "Morceau"} · YuE2 Studio`;
       }
-      if (!$(".detail", target)) target.innerHTML = '<p>Sélectionnez un morceau dans la bibliothèque.</p>';
-      target.classList.toggle("detail-empty", !$(".detail", target));
     }
     if (target.id === "queue") {
       const live = $('[data-role="live-abc"]', target);
       if (live) live.scrollTop = live.scrollHeight;
     }
     if (target.id === "library") {
-      const count = $('[data-role="library-count"]'); if (count) count.textContent = $$(".track", target).length;
       const id = $(".detail")?.dataset.job;
       if (id) $$(".track", target).forEach(x => x.classList.toggle("selected", x.dataset.job === id));
     }
@@ -773,18 +755,14 @@
     applyGlobalHelp();
     initForm(document);
     try { if (localStorage.getItem("yue2.assistant") === "1") setAssistantOpen(true); } catch (_) {}
-    try { const saved = localStorage.getItem("yue2.mode"); if (saved && !location.hash) setMode(saved, false); } catch (_) {}
     abInit(document);
     const pm = /#project=([A-Za-z0-9_.-]+)/.exec(location.hash);
     if (pm && $("#assistant-body") && window.htmx) {
       htmx.ajax("GET", `/assistant/panel?project_id=${pm[1]}`, { target: "#assistant-body", swap: "innerHTML" }).then(() => setAssistantOpen(true));
       history.replaceState(null, "", location.pathname);
     }
-    const m = /#job=([A-Za-z0-9_.-]+)/.exec(location.hash);
-    if (m && $("#detail") && window.htmx) {
-      htmx.ajax("GET", `/jobs/${m[1]}`, { target: "#detail", swap: "innerHTML" }).then(() => $("#detail")?.scrollIntoView({ behavior: "smooth", block: "start" }));
-      history.replaceState(null, "", location.pathname);
-    }
+    const m = /#job=([A-Za-z0-9_.-]+)/.exec(location.hash);   // anciens liens « /studio#job=… » : la fiche vit désormais sous Morceaux
+    if (m) location.replace(`/morceaux/${m[1]}`);
     $("#settings-dialog")?.addEventListener("click", ev => { if (ev.target === ev.currentTarget) ev.currentTarget.close(); });
   });
 })();

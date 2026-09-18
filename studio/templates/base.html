@@ -23,7 +23,7 @@
   </div>
   <nav class="mainnav">
     <a href="/" class="{% if page == 'landing' %}active{% endif %}">♫ Morceaux</a>
-    <a href="/studio" class="{% if page == 'studio' %}active{% endif %}">⚒ Studio</a>
+    <a href="/studio" class="{% if page == 'studio' %}active{% endif %}">✎ Composer</a>
   </nav>
   <div id="status" sse-swap="status" hx-get="/partials/status" hx-trigger="status-changed from:body">
     {% include "partials/status.html" %}

@@ -72,7 +72,8 @@
         </table>
         {% if loop.last and project.proposal and project.proposal.name == p.name %}
         <div class="row gap" style="margin-top:8px">
-          <button type="button" class="btn primary small" hx-post="/assistant/apply" hx-vals='{"project_id": "{{ project.id }}"}' hx-target="#form-panel" hx-swap="innerHTML">⇩ Appliquer au formulaire</button>
+          {% if on_composer %}<button type="button" class="btn primary small" hx-post="/assistant/apply" hx-vals='{"project_id": "{{ project.id }}"}' hx-target="#form-panel" hx-swap="innerHTML">⇩ Appliquer au formulaire</button>
+          {% else %}<a class="btn primary small" href="/studio?apply={{ project.id }}">⇩ Ouvrir dans Composer</a>{% endif %}
           <span class="muted small">Génération suivante = v{{ project.next_number }}.</span>
         </div>
         {% endif %}

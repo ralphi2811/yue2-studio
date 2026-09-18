@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% set page = "landing" %}
+{% block title %}{{ job.name }} · YuE2 Studio{% endblock %}
+{% block topbar_actions %}
+    <button class="btn" data-action="toggle-assistant" title="Conversation de l'assistant pour ce morceau">✨ Assistant</button>
+{% endblock %}
+{% block body %}
+<main class="layout layout-browse" id="layout">
+  <section class="panel panel-library">
+    <div id="library" sse-swap="library" hx-get="/partials/library" hx-trigger="library-changed from:body">
+      {% include "partials/library.html" %}
+    </div>
+  </section>
+
+  <section class="panel panel-queue">
+    <div id="queue" sse-swap="queue" hx-get="/partials/queue" hx-trigger="queue-changed from:body">
+      {% include "partials/queue.html" %}
+    </div>
+  </section>
+
+  <section class="panel panel-detail">
+    <div id="detail">
+      {% include "partials/job_detail.html" %}
+    </div>
+  </section>
+</main>
+
+<aside id="assistant-drawer" class="drawer" hidden aria-label="Assistant de composition">
+  <div id="assistant-body" hx-get="/assistant/panel?job_id={{ job.id }}" hx-trigger="load, assistant-config-changed from:body" hx-swap="innerHTML">
+    <p class="muted">Chargement…</p>
+  </div>
+</aside>
+{% endblock %}

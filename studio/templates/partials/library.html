@@ -6,11 +6,11 @@
            hx-get="/partials/library" hx-trigger="input changed delay:250ms, search" hx-target="#library" hx-swap="innerHTML">
   </div>
   {% if not history %}
-  <p class="muted empty">Aucun morceau pour l'instant. Lancez une génération : le résultat apparaîtra ici avec son lecteur, sa partition et ses réglages.</p>
+  <p class="muted empty">Aucun morceau pour l'instant. <a href="/studio">Composez-en un</a> : le résultat apparaîtra ici avec son lecteur, sa partition et ses réglages.</p>
   {% endif %}
   <ul class="tracks">
     {% for job in history %}
-    <li class="track st-{{ job.status }}" data-job="{{ job.id }}" hx-get="/jobs/{{ job.id }}" hx-target="#detail" hx-swap="innerHTML" role="button" tabindex="0">
+    <li class="track st-{{ job.status }}{% if selected_job is defined and selected_job == job.id %} selected{% endif %}" data-job="{{ job.id }}" hx-get="/jobs/{{ job.id }}" hx-target="#detail" hx-swap="innerHTML" hx-push-url="/morceaux/{{ job.id }}" role="button" tabindex="0">
       <div class="track-main">
         <span class="track-name">{{ job.name }}</span>
         <span class="track-meta muted">

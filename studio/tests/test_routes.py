@@ -53,12 +53,14 @@ def test_pages_render(client):
     assert "Mes morceaux" in client.get("/").text
     r = client.get("/studio")
     assert r.status_code == 200 and 'id="job-form"' in r.text and "assistant-drawer" in r.text
-    # deux modes : les quatre panneaux existent, le mode initial est « Composer »
-    assert 'data-mode="compose"' in r.text and 'data-action="mode" data-mode="browse"' in r.text
-    for cls in ("panel-form", "panel-queue", "panel-detail", "panel-library"):
-        assert f'class="panel {cls}"' in r.text, cls
+    # Composer : formulaire + file d'attente, rien d'autre (ni bibliothèque, ni fiche, ni sous-onglets)
+    assert 'class="layout layout-compose"' in r.text and "✎ Composer" in r.text
+    assert 'class="panel panel-form"' in r.text and 'class="panel panel-queue"' in r.text
+    assert "panel-library" not in r.text and "panel-detail" not in r.text and "mode-tab" not in r.text
     assert client.get("/partials/settings").status_code == 200
     assert client.get("/partials/form?from_job=nope").status_code == 404
+    assert client.get("/studio?from_job=nope").status_code == 404
+    assert client.get("/morceaux/nope").status_code == 404
     assert client.get("/api/state").json()["model_state"] in {"unloaded", "loading", "ready", "error"}
 
 
@@ -94,7 +96,35 @@ def test_form_title_reflects_origin_and_detail_has_close_bar(client, engine, fak
     r = client.post("/jobs", data=dict(BASE, lyrics="", origin_kind="variation", origin_name="route test"))
     assert r.status_code == 422 and "Variation de « route test »" in r.text
     detail = client.get(f"/jobs/{job.id}").text
-    assert "Morceau sélectionné" in detail and 'data-action="close-detail"' in detail
+    assert "Tous les morceaux" in detail and 'href="/"' in detail
+    # les actions de la fiche ouvrent Composer pré-rempli (page complète, pas un panneau caché)
+    assert f'href="/studio?from_job={job.id}&mode=variation"' in detail and f'href="/studio?from_job={job.id}&mode=reuse"' in detail
+    page = client.get(f"/studio?from_job={job.id}&mode=variation").text
+    assert "Variation de « route test »" in page and 'class="layout layout-compose"' in page
+
+
+def test_track_page_lives_under_morceaux(client, engine, fake_runner, make_job, store, monkeypatch):
+    monkeypatch.setattr(A, "_STORE", store)
+    client.post("/jobs", data=BASE)
+    job = wait_done(engine, next(j.id for j in engine.jobs.values() if j.name == "route test"))
+    other = make_job("autre", score=SCORE)
+    r = client.get(f"/morceaux/{job.id}")
+    assert r.status_code == 200
+    text = r.text
+    # onglet Morceaux actif, disposition « fiche » : bibliothèque + file + fiche, pas de formulaire
+    assert 'href="/" class="active"' in text and 'class="layout layout-browse"' in text
+    assert 'class="panel panel-library"' in text and 'class="panel panel-detail"' in text and "panel-form" not in text
+    assert f'<article class="detail" data-job="{job.id}"' in text and "<title>route test · YuE2 Studio</title>" in text
+    # le morceau ouvert est marqué dans la liste ; les autres pistes ont un lien profond
+    assert f'class="track st-done selected" data-job="{job.id}"' in text
+    assert f'hx-push-url="/morceaux/{other.id}"' in text
+    # l'assistant se charge sur ce morceau
+    assert f'/assistant/panel?job_id={job.id}' in text
+    # la galerie et le lecteur global pointent vers cette page, plus vers « /studio#job= »
+    gallery = client.get("/").text
+    assert f'href="/morceaux/{job.id}"' in gallery and "#job=" not in gallery
+    # « Derniers terminés » de la file d'attente mène à la fiche
+    assert f'href="/morceaux/{job.id}"' in client.get("/partials/queue").text
 
 
 SCORE = "X:1\nM:4/4\nQ:1/4=90\nK:C\nV: Vocal\nC4|D4|E4|F4|\n"
@@ -286,6 +316,14 @@ def test_assistant_flow_creates_project_and_versions(client, engine, fake_runner
     r = client.post("/assistant/apply", data={"project_id": project.id})
     assert r.status_code == 200 and f'name="project_id" value="{project.id}"' in r.text and "v1 du projet" in r.text
     assert "Nouvelle version de « prop_song »" in r.text and "Repartir de zéro" in r.text
+    # 2 bis. depuis la fiche d'un morceau (pas de formulaire sur la page) le bouton devient un lien vers Composer
+    on_track = client.get(f"/assistant/panel?project_id={project.id}", headers={"HX-Current-URL": "http://x/morceaux/abc"}).text
+    assert f'href="/studio?apply={project.id}"' in on_track and "Appliquer au formulaire" not in on_track
+    on_composer = client.get(f"/assistant/panel?project_id={project.id}", headers={"HX-Current-URL": "http://x/studio?from_job=z"}).text
+    assert "Appliquer au formulaire" in on_composer and "?apply=" not in on_composer
+    page = client.get(f"/studio?apply={project.id}").text
+    assert f'name="project_id" value="{project.id}"' in page and "v1 du projet" in page and "Nouvelle version de « prop_song »" in page
+    assert client.get("/studio?apply=ghost").status_code == 404
     # 3. générer telle quelle → version 1 « assistant »
     r = client.post("/jobs", data={"name": "prop_song", "style": "French, indie pop, 84 BPM", "lyrics": "[Verse]\nun\ndeux\n\n[Chorus]\ntrois\nquatre",
                                    "cot": "full", "seed": "5", "kind": "song", "project_id": project.id})
