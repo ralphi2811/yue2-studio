@@ -1,7 +1,7 @@
 # YuE2 Studio — hébergement conteneurisé sur une machine avec GPU NVIDIA (24 Go de VRAM recommandés).
 # Prérequis hôte : pilote NVIDIA + nvidia-container-toolkit (https://docs.nvidia.com/datacenter/cloud-native/).
 #
-#   cp .env.example .env    # puis renseignez YUE2_LLM_API_KEY (optionnelle : assistant de composition)
+#   cp .env.example .env    # puis renseignez YUE2_LLM_API_KEY / _BASE_URL / _MODEL (optionnels : assistant de composition)
 #   docker compose up -d    # Compose lit le .env automatiquement
 #   docker compose logs -f studio
 #
@@ -18,7 +18,11 @@ services:
       - "${YUE2_STUDIO_PORT:-8420}:8420"
     environment:
       YUE2_LLM_API_KEY: ${YUE2_LLM_API_KEY:-}
+      YUE2_LLM_BASE_URL: ${YUE2_LLM_BASE_URL:-}
+      YUE2_LLM_MODEL: ${YUE2_LLM_MODEL:-}
       HF_TOKEN: ${HF_TOKEN:-}                 # inutile pour les modèles publics m-a-p/YuE2-*
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # pour joindre un LLM local sur l'hôte (Ollama : http://host.docker.internal:11434/v1)
     volumes:
       - models:/models                        # cache Hugging Face (YuE2-3B ≈ 6,8 Go + VAE ≈ 0,5 Go)
       - outputs:/outputs                      # morceaux générés et projets

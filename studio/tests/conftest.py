@@ -15,7 +15,8 @@ import pytest
 _TMP = Path(tempfile.mkdtemp(prefix="yue2-studio-tests-"))
 os.environ["YUE2_STUDIO_OUTPUT"] = str(_TMP / "outputs")
 os.environ["YUE2_STUDIO_DATA"] = str(_TMP / "data")
-os.environ.pop("YUE2_LLM_API_KEY", None)
+for _k in ("YUE2_LLM_API_KEY", "YUE2_LLM_BASE_URL", "YUE2_LLM_MODEL"):
+    os.environ.pop(_k, None)
 
 ROOT = Path(__file__).resolve().parents[2]
 for entry in (str(ROOT), str(ROOT / "src")):

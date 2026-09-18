@@ -1,8 +1,10 @@
 """Connecteur LLM OpenAI-compatible (OpenRouter, OpenAI, Mistral, Ollama, LM Studio, vLLM…).
 
-Un seul protocole : ``POST {base_url}/chat/completions``. La clé vient de la variable
-d'environnement ``YUE2_LLM_API_KEY`` si elle est définie, sinon du fichier de réglages
-local ``studio/data/assistant.json`` (hors git).
+Un seul protocole : ``POST {base_url}/chat/completions``. La clé, l'URL de base et le modèle
+viennent des variables d'environnement ``YUE2_LLM_API_KEY``, ``YUE2_LLM_BASE_URL`` et
+``YUE2_LLM_MODEL`` si elles sont définies (typiquement via le ``.env``), sinon du fichier de
+réglages local ``studio/data/assistant.json`` (hors git). Une valeur venue de l'environnement
+verrouille le champ correspondant dans l'interface.
 """
 from __future__ import annotations
 
@@ -18,6 +20,8 @@ from .paths import DATA_DIR
 
 SETTINGS_FILE = DATA_DIR / "assistant.json"
 ENV_KEY = "YUE2_LLM_API_KEY"
+ENV_BASE_URL = "YUE2_LLM_BASE_URL"
+ENV_MODEL = "YUE2_LLM_MODEL"
 
 PRESETS = {
     "openrouter": ("https://openrouter.ai/api/v1", "anthropic/claude-sonnet-4.5"),
@@ -50,8 +54,24 @@ class LLMSettings:
         return bool(os.environ.get(ENV_KEY))
 
     @property
+    def effective_base_url(self) -> str:
+        return (os.environ.get(ENV_BASE_URL) or self.base_url or "").strip().rstrip("/")
+
+    @property
+    def base_url_from_env(self) -> bool:
+        return bool(os.environ.get(ENV_BASE_URL, "").strip())
+
+    @property
+    def effective_model(self) -> str:
+        return (os.environ.get(ENV_MODEL) or self.model or "").strip()
+
+    @property
+    def model_from_env(self) -> bool:
+        return bool(os.environ.get(ENV_MODEL, "").strip())
+
+    @property
     def ready(self) -> bool:
-        return bool(self.base_url.strip() and self.model.strip())
+        return bool(self.effective_base_url and self.effective_model)
 
     @classmethod
     def load(cls) -> "LLMSettings":
@@ -76,6 +96,11 @@ class LLMSettings:
         d["api_key"] = ""
         d["has_key"] = bool(self.effective_key)
         d["key_from_env"] = self.key_from_env
+        d["base_url"] = self.effective_base_url
+        d["base_url_from_env"] = self.base_url_from_env
+        d["model"] = self.effective_model
+        d["model_from_env"] = self.model_from_env
+        d["ready"] = self.ready
         return d
 
 
@@ -105,7 +130,7 @@ def _headers(s: LLMSettings) -> dict:
 async def list_models(s: LLMSettings | None = None) -> list[str]:
     s = s or get_settings()
     async with httpx.AsyncClient(timeout=20) as client:
-        r = await client.get(s.base_url.rstrip("/") + "/models", headers=_headers(s))
+        r = await client.get(s.effective_base_url + "/models", headers=_headers(s))
     if r.status_code >= 400:
         raise LLMError(f"HTTP {r.status_code} sur /models : {r.text[:300]}")
     data = r.json()
@@ -150,12 +175,12 @@ async def chat(messages: list[dict], *, json_mode: bool = True, s: LLMSettings |
     s = s or get_settings()
     if not s.ready:
         raise LLMError("Assistant non configuré : renseignez l'URL et le modèle dans ⚙︎ Moteur → Assistant LLM.")
-    payload = {"model": s.model, "messages": messages,
+    payload = {"model": s.effective_model, "messages": messages,
                "temperature": s.temperature if temperature is None else temperature,
                "max_tokens": s.max_tokens if max_tokens is None else max_tokens}
     if json_mode:
         payload["response_format"] = {"type": "json_object"}
-    url = s.base_url.rstrip("/") + "/chat/completions"
+    url = s.effective_base_url + "/chat/completions"
     async with httpx.AsyncClient(timeout=s.timeout) as client:
         r = await client.post(url, headers=_headers(s), json=payload)
         if r.status_code == 400 and json_mode:

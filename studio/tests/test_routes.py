@@ -160,6 +160,29 @@ def test_assistant_settings_roundtrip(client, monkeypatch, tmp_path):
     assert client.post("/assistant/settings", data={"base_url": "u", "model": "x", "temperature": "abc", "max_tokens": "1"}).status_code == 422
 
 
+def test_assistant_settings_locked_by_environment(client, monkeypatch, tmp_path):
+    monkeypatch.setattr(llm, "SETTINGS_FILE", tmp_path / "assistant.json")
+    monkeypatch.setattr(llm, "_SETTINGS", llm.LLMSettings(base_url="http://saved/v1", model="saved-model"))
+    monkeypatch.setenv("YUE2_LLM_BASE_URL", "http://env-host/v1")
+    monkeypatch.setenv("YUE2_LLM_MODEL", "env-model")
+    # le formulaire affiche les valeurs imposées, champs désactivés, préréglages masqués
+    r = client.get("/partials/settings")
+    assert r.status_code == 200
+    assert 'value="http://env-host/v1"' in r.text and 'value="env-model"' in r.text
+    assert "YUE2_LLM_BASE_URL" in r.text and 'data-action="llm-preset"' not in r.text
+    assert r.text.count("disabled title=") == 2
+    # un envoi (champs désactivés donc absents) ne doit pas effacer les valeurs enregistrées
+    r = client.post("/assistant/settings", data={"temperature": "0.5", "max_tokens": "1000"})
+    assert r.status_code == 200 and "Actif : env-model @ http://env-host/v1" in r.text
+    saved = json.loads((tmp_path / "assistant.json").read_text())
+    assert saved["base_url"] == "http://saved/v1" and saved["model"] == "saved-model" and saved["temperature"] == 0.5
+    # une seule variable : seul ce champ est verrouillé, l'autre reste modifiable
+    monkeypatch.delenv("YUE2_LLM_MODEL")
+    r = client.post("/assistant/settings", data={"model": "chosen", "temperature": "0.5", "max_tokens": "1000"})
+    assert r.status_code == 200 and "Actif : chosen @ http://env-host/v1" in r.text and 'data-action="llm-preset"' in r.text
+    assert json.loads((tmp_path / "assistant.json").read_text())["model"] == "chosen"
+
+
 def test_assistant_flow_creates_project_and_versions(client, engine, fake_runner, fake_llm, store, monkeypatch):
     monkeypatch.setattr(A, "_STORE", store)
     # 1. message → projet créé + proposition

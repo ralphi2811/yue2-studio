@@ -773,8 +773,11 @@ async def assistant_settings(request: Request):
         key = ""
     if (form.get("api_key") or "").strip():
         key = form.get("api_key").strip()
-    settings = llm.LLMSettings(base_url=(form.get("base_url") or "").strip().rstrip("/"), model=(form.get("model") or "").strip(),
-                               api_key=key, temperature=min(max(temperature, 0.0), 2.0), max_tokens=min(max(max_tokens, 256), 32000))
+    # Un champ imposé par l'environnement n'est pas soumis (désactivé dans l'UI) : on conserve la valeur enregistrée.
+    base_url = current.base_url if current.base_url_from_env else (form.get("base_url") or "").strip().rstrip("/")
+    model = current.model if current.model_from_env else (form.get("model") or "").strip()
+    settings = llm.LLMSettings(base_url=base_url, model=model, api_key=key,
+                               temperature=min(max(temperature, 0.0), 2.0), max_tokens=min(max(max_tokens, 256), 32000))
     llm.set_settings(settings)
     ctx = llm_ctx(llm_flash="Connecteur enregistré.")
     if form.get("test") == "1":
@@ -782,9 +785,9 @@ async def assistant_settings(request: Request):
             models = await llm.list_models(settings)
             ctx["llm_models"] = models
             ctx["llm_flash"] = f"Connexion OK : {len(models)} modèle(s) annoncé(s)."
-            if settings.model:
+            if settings.effective_model:
                 content, _ = await llm.chat([{"role": "user", "content": 'Réponds exactement {"ok": true}'}], s=settings, max_tokens=50, temperature=0)
-                ctx["llm_flash"] += f" Appel de test réussi avec {settings.model}."
+                ctx["llm_flash"] += f" Appel de test réussi avec {settings.effective_model}."
         except Exception as exc:
             ctx["llm_flash"] = None
             ctx["llm_error"] = f"Test échoué : {exc}"

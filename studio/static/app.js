@@ -574,8 +574,9 @@
       }
       case "llm-preset": {
         const f = t.closest("form");
-        $('[name="base_url"]', f).value = t.dataset.url;
-        if (t.dataset.model !== undefined) $('[name="model"]', f).value = t.dataset.model;
+        const url = $('[name="base_url"]', f), model = $('[name="model"]', f);
+        if (url && !url.disabled) url.value = t.dataset.url;
+        if (model && !model.disabled && t.dataset.model !== undefined) model.value = t.dataset.model;
         break;
       }
       case "strip-chords": stripChords(form); break;

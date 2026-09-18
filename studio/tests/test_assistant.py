@@ -22,6 +22,54 @@ def test_estimate_duration_calibration():
     assert est2["bars"] == 25 + 8
 
 
+# ---------------------------------------------------------------- réglages LLM et environnement
+def test_llm_settings_env_overrides_saved_values(monkeypatch):
+    s = llm.LLMSettings(base_url="http://saved/v1/", model="saved-model", api_key="saved-key")
+    assert s.effective_base_url == "http://saved/v1" and s.effective_model == "saved-model" and s.ready
+    assert not (s.base_url_from_env or s.model_from_env or s.key_from_env)
+    monkeypatch.setenv("YUE2_LLM_BASE_URL", "http://host.docker.internal:11434/v1/ ")
+    monkeypatch.setenv("YUE2_LLM_MODEL", " qwen3:32b ")
+    monkeypatch.setenv("YUE2_LLM_API_KEY", "env-key")
+    assert s.effective_base_url == "http://host.docker.internal:11434/v1" and s.base_url_from_env
+    assert s.effective_model == "qwen3:32b" and s.model_from_env
+    assert s.effective_key == "env-key" and s.key_from_env
+    pub = s.public()
+    assert pub["base_url"] == "http://host.docker.internal:11434/v1" and pub["model"] == "qwen3:32b" and pub["ready"]
+    assert pub["base_url_from_env"] and pub["model_from_env"] and pub["api_key"] == "" and pub["has_key"]
+    # une variable vide ne verrouille rien et n'écrase pas la valeur enregistrée
+    monkeypatch.setenv("YUE2_LLM_MODEL", "")
+    assert s.effective_model == "saved-model" and not s.model_from_env
+
+
+def test_llm_settings_ready_from_env_alone(monkeypatch):
+    s = llm.LLMSettings(base_url="", model="")
+    assert not s.ready
+    monkeypatch.setenv("YUE2_LLM_BASE_URL", "http://localhost:1234/v1")
+    assert not s.ready
+    monkeypatch.setenv("YUE2_LLM_MODEL", "local")
+    assert s.ready
+
+
+@pytest.mark.anyio
+async def test_chat_uses_env_base_url_and_model(monkeypatch):
+    import httpx
+    seen = {}
+
+    async def post(self, url, headers=None, json=None):
+        seen["url"] = url
+        seen["model"] = json["model"]
+        seen["auth"] = headers.get("Authorization")
+        return httpx.Response(200, json={"choices": [{"message": {"content": "{\"ok\": true}"}}], "usage": {}})
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", post)
+    monkeypatch.setenv("YUE2_LLM_BASE_URL", "http://env-host/v1")
+    monkeypatch.setenv("YUE2_LLM_MODEL", "env-model")
+    s = llm.LLMSettings(base_url="http://saved/v1", model="saved", api_key="k")
+    content, _ = await llm.chat([{"role": "user", "content": "x"}], s=s)
+    assert content == '{"ok": true}'
+    assert seen == {"url": "http://env-host/v1/chat/completions", "model": "env-model", "auth": "Bearer k"}
+
+
 # ---------------------------------------------------------------- extraction JSON
 @pytest.mark.parametrize("text", [
     '{"a": 1}',
