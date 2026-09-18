@@ -559,7 +559,22 @@
       case "rename": startRename(t); break;
       case "rename-cancel": cancelRename(t); break;
       case "toggle-assistant": setAssistantOpen($("#assistant-drawer").hidden); break;
-      case "detach-project": { $('#job-form [name="project_id"]').value = ""; t.closest(".project-badge").remove(); break; }
+      case "detach-project": {
+        const f = $("#job-form");
+        $('[name="project_id"]', f).value = "";
+        t.closest(".project-badge").remove();
+        const kind = $('[name="origin_kind"]', f)?.value, name = $('[name="origin_name"]', f)?.value;
+        const labels = { reuse: "Réglages repris de", variation: "Variation de", "edit-score": "Partition retouchée de" };
+        const title = $('[data-role="form-title"]', f);
+        if (title) title.textContent = kind === "assistant" ? "Proposition de l'assistant" : (labels[kind] && name ? `${labels[kind]} « ${name} »` : "Nouveau morceau");
+        break;
+      }
+      case "close-detail": {
+        const d = $("#detail");
+        if (d) { d.innerHTML = "<p>Sélectionnez un morceau dans la bibliothèque pour l'écouter, lire sa partition et ses réglages.</p>"; d.classList.add("detail-empty"); }
+        $$(".track.selected").forEach(x => x.classList.remove("selected"));
+        break;
+      }
       case "close-assistant": setAssistantOpen(false); break;
       case "starter": {
         const ta = $("#assistant-body textarea");

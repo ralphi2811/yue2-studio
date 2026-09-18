@@ -221,7 +221,28 @@ def job_to_form(job: Job, mode: str) -> dict[str, Any]:
     elif mode == "variation":
         values["seed"] = random.randrange(0, 2**31)
         values["name"] = f"{job.name}_v{values['seed'] % 1000:03d}"
+    values["origin_kind"] = mode if mode in ("reuse", "variation", "edit-score") else "reuse"
+    values["origin_name"] = job.name
     return values
+
+
+ORIGIN_LABELS = {"reuse": "Réglages repris de", "variation": "Variation de", "edit-score": "Partition retouchée de",
+                 "assistant": "Proposition de l'assistant"}
+
+
+def form_origin(values: dict, project) -> str | None:
+    """Titre contextuel du formulaire : d'où viennent les valeurs pré-remplies (None = formulaire vierge)."""
+    kind = values.get("origin_kind") or ""
+    if project is not None:
+        return f"Nouvelle version de « {project.name} »"
+    if kind == "assistant":
+        return ORIGIN_LABELS["assistant"]
+    if kind in ORIGIN_LABELS and values.get("origin_name"):
+        return f"{ORIGIN_LABELS[kind]} « {values['origin_name']} »"
+    return None
+
+
+templates.env.globals["form_origin"] = form_origin
 
 
 # --------------------------------------------------------------------------
@@ -348,7 +369,8 @@ async def partial_settings(request: Request):
 async def create_job(request: Request):
     form = await request.form()
     values = {k: form.get(k) for k in P.ALL_PARAMS}
-    values["source_job"] = form.get("source_job")
+    for k in ("source_job", "origin_kind", "origin_name"):
+        values[k] = form.get(k)
     try:
         job = parse_job_form(form)
     except FormError as exc:

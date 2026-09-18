@@ -2,10 +2,14 @@
 <form id="job-form" hx-post="/jobs" hx-target="#form-panel" hx-swap="innerHTML" hx-indicator="#submit-indicator" autocomplete="off" data-open-tab="{{ open_tab or '' }}">
   <input type="hidden" name="source_job" value="{{ values.get('source_job') or '' }}">
   <input type="hidden" name="project_id" value="{{ values.get('project_id') or '' }}">
+  <input type="hidden" name="origin_kind" value="{{ values.get('origin_kind') or '' }}">
+  <input type="hidden" name="origin_name" value="{{ values.get('origin_name') or '' }}">
   {% set proj = project_of(values.get('project_id')) %}
+  {% set origin = form_origin(values, proj) %}
   <div class="panel-head">
-    <h2>Nouveau morceau</h2>
-    {% if proj %}<span class="project-badge" title="Cette génération sera enregistrée comme version du projet">✨ {{ proj.name }} · v{{ proj.next_number }} <button type="button" class="btn ghost tiny" data-action="detach-project" title="Générer hors projet">✕</button></span>{% endif %}
+    <h2 class="form-title" data-role="form-title">{{ origin or "Nouveau morceau" }}</h2>
+    {% if proj %}<span class="project-badge" title="Cette génération sera enregistrée comme version v{{ proj.next_number }} du projet « {{ proj.name }} »">✨ v{{ proj.next_number }} <button type="button" class="btn ghost tiny" data-action="detach-project" title="Générer hors projet">✕</button></span>{% endif %}
+    {% if origin %}<button type="button" class="btn ghost small" hx-get="/partials/form" hx-target="#form-panel" hx-swap="innerHTML" hx-confirm="Vider le formulaire et repartir d'un morceau vierge ?" title="Formulaire vierge, hors projet">↩ Repartir de zéro</button>{% endif %}
     <nav class="tabs" role="tablist">
       <button type="button" class="tab active" data-tab="song">Chanson</button>
       <button type="button" class="tab" data-tab="score">Partition</button>

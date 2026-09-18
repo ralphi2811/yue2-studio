@@ -1,5 +1,9 @@
 {% import "macros.html" as m %}
 <article class="detail" data-job="{{ job.id }}">
+  <div class="detail-bar">
+    <span class="eyebrow">Morceau sélectionné <span class="muted">· depuis la bibliothèque</span></span>
+    <button type="button" class="btn ghost tiny" data-action="close-detail" title="Refermer la fiche (le morceau reste dans la bibliothèque)">✕ fermer</button>
+  </div>
   <header class="detail-head">
     <div>
       <div class="card-title">

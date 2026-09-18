@@ -237,6 +237,12 @@ select.inline { width: auto; padding: 4px 8px; font-size: 12px; }
 
 /* ---------- détail ---------- */
 .detail-empty { padding: 30px 20px; text-align: center; color: var(--fg-faint); border: 1px dashed var(--line); border-radius: var(--radius); }
+.detail { border-top: 2px solid var(--accent); padding-top: 10px; }
+.detail-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.eyebrow .muted { font-weight: 500; letter-spacing: 0; text-transform: none; }
+.panel-queue:has(#detail .detail) .queue .empty { display: none; }
+.form-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .detail-head h2 { font-size: 17px; }
 .player { background: var(--bg-input); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 12px; }

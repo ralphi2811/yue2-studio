@@ -317,6 +317,8 @@ def proposal_to_form(prop: dict, project: Project | None = None) -> dict:
             values[f"{prefix}.{k}"] = v
     if project is not None:
         values["project_id"] = project.id
+    values["origin_kind"] = "assistant"
+    values["origin_name"] = prop["name"]
     return values
 
 

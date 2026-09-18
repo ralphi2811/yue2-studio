@@ -78,6 +78,35 @@ def test_create_job_runs_and_appears_in_library(client, engine, fake_runner):
     assert client.get(f"/jobs/{job_id}/file/nope.txt").status_code == 404
 
 
+def test_form_title_reflects_origin_and_detail_has_close_bar(client, engine, fake_runner):
+    blank = client.get("/partials/form").text
+    assert "Nouveau morceau" in blank and "Repartir de zéro" not in blank
+    client.post("/jobs", data=BASE)
+    job = wait_done(engine, next(j.id for j in engine.jobs.values() if j.name == "route test"))
+    r = client.get(f"/partials/form?from_job={job.id}&mode=variation").text
+    assert "Variation de « route test »" in r and "Repartir de zéro" in r and 'name="origin_kind" value="variation"' in r
+    assert "Réglages repris de « route test »" in client.get(f"/partials/form?from_job={job.id}&mode=reuse").text
+    # l'origine survit à une erreur de validation (le formulaire est renvoyé avec son titre)
+    r = client.post("/jobs", data=dict(BASE, lyrics="", origin_kind="variation", origin_name="route test"))
+    assert r.status_code == 422 and "Variation de « route test »" in r.text
+    detail = client.get(f"/jobs/{job.id}").text
+    assert "Morceau sélectionné" in detail and 'data-action="close-detail"' in detail
+
+
+def test_form_origin_labels():
+    from studio.app import form_origin
+
+    class Proj:
+        name = "mon_projet"
+
+    assert form_origin({}, None) is None
+    assert form_origin({"origin_kind": "reuse"}, None) is None            # pas de nom : pas de titre
+    assert form_origin({"origin_kind": "edit-score", "origin_name": "x"}, None) == "Partition retouchée de « x »"
+    assert form_origin({"origin_kind": "assistant", "origin_name": "x"}, None) == "Proposition de l'assistant"
+    assert form_origin({"origin_kind": "reuse", "origin_name": "x"}, Proj()) == "Nouvelle version de « mon_projet »"
+    assert form_origin({"origin_kind": "inconnu", "origin_name": "x"}, None) is None
+
+
 def test_rename_and_delete_job(client, make_job):
     job = make_job("renommable")
     r = client.patch(f"/jobs/{job.id}/name", data={"name": "Nouveau nom é"})
@@ -193,6 +222,7 @@ def test_assistant_flow_creates_project_and_versions(client, engine, fake_runner
     # 2. appliquer → formulaire avec project_id
     r = client.post("/assistant/apply", data={"project_id": project.id})
     assert r.status_code == 200 and f'name="project_id" value="{project.id}"' in r.text and "v1 du projet" in r.text
+    assert "Nouvelle version de « prop_song »" in r.text and "Repartir de zéro" in r.text
     # 3. générer telle quelle → version 1 « assistant »
     r = client.post("/jobs", data={"name": "prop_song", "style": "French, indie pop, 84 BPM", "lyrics": "[Verse]\nun\ndeux\n\n[Chorus]\ntrois\nquatre",
                                    "cot": "full", "seed": "5", "kind": "song", "project_id": project.id})
