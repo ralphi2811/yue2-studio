@@ -22,6 +22,18 @@ def test_estimate_duration_calibration():
     assert est2["bars"] == 25 + 8
 
 
+# ---------------------------------------------------------------- instrumental
+def test_normalize_proposal_instrumental_forces_full_and_reaches_the_form():
+    prop, warnings = A.normalize_proposal({"name": "instru", "style": "dark ambient, 70 BPM", "lyrics": "[intro]\n[verse]\n[outro]",
+                                           "cot": "melody", "instrumental": "true", "target_duration_seconds": 60})
+    assert prop["instrumental"] is True and prop["cot"] == "full"
+    assert any("remplacé par full" in w for w in warnings) and any("expérimental" in w for w in warnings)
+    assert A.proposal_to_form(prop)["instrumental"] is True
+    prop2, warnings2 = A.normalize_proposal({"name": "x", "style": "pop, 90 BPM", "lyrics": "[Intro]\n[Outro]", "cot": "full"})
+    assert prop2["instrumental"] is False and any("cochez « Instrumental »" in w for w in warnings2)
+    assert A.proposal_to_form(prop2)["instrumental"] is False
+
+
 # ---------------------------------------------------------------- réglages LLM et environnement
 def test_llm_settings_env_overrides_saved_values(monkeypatch):
     s = llm.LLMSettings(base_url="http://saved/v1/", model="saved-model", api_key="saved-key")

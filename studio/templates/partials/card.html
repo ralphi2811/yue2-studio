@@ -26,7 +26,7 @@
     </div>
     <p class="card-style" title="{{ job.request.style }}">{{ job.request.style }}</p>
     <div class="card-meta muted small">
-      <span>{{ job.request.cot }}</span> · <span class="mono">seed {{ job.request.seed }}</span> · <span>{{ job.created[:10] }}</span>
+      {% if job.instrumental %}<span class="accent">instrumental</span> · {% endif %}<span>{{ job.request.cot }}</span> · <span class="mono">seed {{ job.request.seed }}</span> · <span>{{ job.created[:10] }}</span>
       {% if job.summary.truncated and (job.summary.truncated.abc or job.summary.truncated.semantic) %} · <span class="warn">tronqué</span>{% endif %}
       {% if job.summary.vae and job.summary.vae != "standard" %} · <span>VAE {{ job.summary.vae }}</span>{% endif %}
     </div>

@@ -63,6 +63,7 @@
         {% if p.rationale.duration %}<p class="why">Durée : {{ p.rationale.duration }}</p>{% endif %}
         <h4>Réglages</h4>
         <table class="kv compact">
+          {% if p.instrumental %}<tr><th>Instrumental</th><td>oui <span class="badge-exp">expérimental</span> <span class="muted">· LoRA instrumentale, paroles réduites aux balises</span></td></tr>{% endif %}
           <tr><th>Mode</th><td>{{ p.cot }}{% if p.rationale.cot %} <span class="muted">· {{ p.rationale.cot }}</span>{% endif %}</td></tr>
           <tr><th>CFG</th><td>{{ p.cfg_scale if p.cfg_scale is not none else "défaut" }}{% if p.rationale.cfg_scale %} <span class="muted">· {{ p.rationale.cfg_scale }}</span>{% endif %}</td></tr>
           <tr><th>Seed</th><td class="mono">{{ p.seed if p.seed is not none else (project.seed if project.seed is not none else "défaut") }}{% if p.seed is none and project.seed is not none %} <span class="muted">· graine du projet conservée</span>{% endif %}</td></tr>

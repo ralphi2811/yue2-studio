@@ -15,7 +15,7 @@
         </form>
       </div>
       <p class="muted small">{{ m.kind_label(job) }} · mode {{ job.request.cot }} · seed <span class="mono">{{ job.request.seed }}</span>
-        {% if job.request.cfg_scale is not none %} · CFG {{ job.request.cfg_scale }}{% endif %}
+        {% if job.request.cfg_scale is not none %} · CFG {{ job.request.cfg_scale }}{% endif %}{% if job.instrumental %} · <span class="accent">instrumental</span>{% endif %}
         · {{ job.created|replace("T", " ") }}{% if job.elapsed %} · {{ job.elapsed|duration }} de calcul{% endif %}</p>
     </div>
     {{ m.status_pill(job) }}
@@ -113,6 +113,7 @@
   <section class="tab-pane" data-pane="d-config">
     <table class="kv">
       <tr><th>Mode CoT</th><td>{{ job.request.cot }}</td></tr>
+      {% if job.instrumental %}<tr><th>Instrumental</th><td>LoRA instrumentale <span class="badge-exp">expérimental</span>{% if job.summary.lora %} <span class="muted mono">· {{ job.summary.lora.repo }} · {{ job.summary.lora.file }} · ×{{ job.summary.lora.scale }} · rang {{ job.summary.lora.rank }} · {{ job.summary.lora.merged_linears }} matrices</span>{% endif %}</td></tr>{% endif %}
       <tr><th>Seed</th><td class="mono">{{ job.request.seed }}</td></tr>
       <tr><th>CFG</th><td>{{ job.request.cfg_scale if job.request.cfg_scale is not none else "auto" }}</td></tr>
       <tr><th>Pas ODE</th><td>{{ job.ode_steps }}</td></tr>

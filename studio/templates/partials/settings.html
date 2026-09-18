@@ -23,6 +23,12 @@
     <div class="grid-2">{% for p in P.ENGINE if p.key in ("device", "budget") %}{{ m.field(p, values) }}{% endfor %}</div>
     <div class="grid-2">{% for p in P.ENGINE if p.key in ("backend", "quantization") %}{{ m.field(p, values) }}{% endfor %}</div>
     <div class="grid-2">{% for p in P.ENGINE if p.key in ("offload_ar", "vae_core_frames") %}{{ m.field(p, values) }}{% endfor %}</div>
+  </fieldset>
+  <fieldset class="group">
+    <legend>Instrumental <span class="badge-exp">expérimental</span></legend>
+    <p class="group-help">LoRA fusionnée dans le modèle autorégressif quand la case « Instrumental » d'un job est cochée. Ces réglages ne demandent pas de rechargement du pipeline. Poids par défaut sous licence CC BY-NC 4.0 (non commercial).</p>
+    {% for p in P.ENGINE if p.key == "instrumental_lora" %}{{ m.field(p, values) }}{% endfor %}
+    <div class="grid-2">{% for p in P.ENGINE if p.key in ("instrumental_lora_file", "instrumental_lora_scale") %}{{ m.field(p, values) }}{% endfor %}</div>
     <details class="explain">
       <summary>Que faire en cas de mémoire GPU insuffisante ?</summary>
       <ol>

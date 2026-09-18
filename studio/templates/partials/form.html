@@ -46,6 +46,10 @@
     </div>
     <div id="quick-why" class="quick-why" hidden></div>
     {% endfor %}
+    {% for p in P.REQUEST if p.key == "instrumental" %}
+    <div class="instrumental-field">{{ m.field(p, values) }}<span class="badge-exp" title="Fonction expérimentale : LoRA communautaire, résultat non garanti">expérimental</span></div>
+    <div id="instrumental-note" class="alert info small" hidden></div>
+    {% endfor %}
 
     <div class="grid-2">
       {% for p in P.REQUEST if p.key == "cot" %}{{ m.field(p, values) }}{% endfor %}

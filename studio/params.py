@@ -58,6 +58,15 @@ REQUEST: tuple[Param, ...] = (
           "du formulaire se met à jour en direct. Gardez les consignes techniques hors des paroles : "
           "tout ce qui est écrit ici est destiné à être chanté.",
           rows=12),
+    Param("instrumental", "Instrumental (expérimental)", "bool", False,
+          "Morceau sans voix. YuE2 n'a pas de mode instrumental natif : entraîné sur des chansons, il ajoute une voix "
+          "même quand la mélodie vocale planifiée est vide. Cette option fusionne dans le modèle une LoRA communautaire "
+          "entraînée sur 2 700 morceaux instrumentaux (Mothersuperior/YuE2-instrumental-cot-full-loras, licence CC BY-NC 4.0, "
+          "usage non commercial). Conséquences : le mode de composition « full » est imposé, les paroles sont réduites à "
+          "leurs balises de section en minuscules ([intro], [verse], [pre-chorus], [chorus], [bridge], [outro], horodatage "
+          "optionnel « [verse 0:15-0:45] »), ou « [instrumental] » seul si aucune balise n'est reconnue. Le modèle est "
+          "rechargé (≈ 10 s) à chaque passage entre chanson et instrumental. Résultat non garanti : la voix peut "
+          "encore apparaître, et l'auteur signale des fins précoces. Backend vllm et quantification FP8 non supportés."),
     Param("cot", "Mode de composition (CoT)", "select", "full",
           "« full » : YuE2 écrit d'abord une partition ABC complète (mélodie + accords) puis la réalise en audio. "
           "C'est le mode par défaut, le plus contrôlable : vous récupérez une partition éditable. "
@@ -215,6 +224,19 @@ ENGINE: tuple[Param, ...] = (
     Param("verify_hashes", "Vérifier les empreintes des poids", "bool", True,
           "Calcule le SHA-256 des fichiers modèle au chargement (quelques secondes). Garantit l'identité exacte "
           "des poids dans les manifestes de résultats."),
+    Param("instrumental_lora", "LoRA instrumentale", "text", "Mothersuperior/YuE2-instrumental-cot-full-loras",
+          "Dépôt Hugging Face, dossier ou fichier local de la LoRA appliquée quand la case « Instrumental » d'un job est "
+          "cochée. Téléchargée dans le cache HF au premier usage (≈ 140 Mo en bf16). Ne nécessite pas de rechargement du "
+          "pipeline : la fusion se fait job par job. Licence de la LoRA par défaut : CC BY-NC 4.0 (non commercial).",
+          placeholder="Mothersuperior/YuE2-instrumental-cot-full-loras"),
+    Param("instrumental_lora_file", "Fichier dans le dépôt", "text", "ar_lora_inst_v3abc.bf16.safetensors",
+          "Nom du fichier safetensors (format lora_A / lora_B par projection, pas la variante ComfyUI fusionnée). "
+          "La version fp32 « ar_lora_inst_v3abc.safetensors » donne le même résultat pour deux fois plus d'octets.",
+          placeholder="ar_lora_inst_v3abc.bf16.safetensors"),
+    Param("instrumental_lora_scale", "Intensité de la LoRA", "float", 1.0,
+          "Facteur appliqué au delta de poids (1.0 = tel qu'entraîné). En dessous de 1, le modèle de base reprend la main : "
+          "plus de variété, plus de risque de voix.",
+          min=0.0, max=2.0, step=0.05),
 )
 
 ALL_PARAMS: dict[str, Param] = {p.key: p for p in (*REQUEST, *ABC_SAMPLING, *SEMANTIC_SAMPLING, *GENERATION, *ENGINE)}

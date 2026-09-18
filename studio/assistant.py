@@ -73,6 +73,7 @@ PROPOSAL_SCHEMA = {
         "name": "identifiant court du morceau (lettres, chiffres, _ -)",
         "style": "prompt de style EN ANGLAIS, séparé par des virgules, avec la langue chantée et le BPM",
         "lyrics": "paroles dans la langue demandée, balises [Intro]/[Verse]/[Pre-Chorus]/[Chorus]/[Bridge]/[Outro], une phrase par ligne",
+        "instrumental": "true UNIQUEMENT si l'utilisateur veut un morceau sans voix (le studio applique alors une LoRA instrumentale, impose cot=full et réduit les paroles à leurs balises), sinon false",
         "cot": "full | melody | off",
         "cfg_scale": "nombre 0..20 ou null (défaut du modèle)",
         "seed": "entier ou null (null = conserver la graine du projet)",
@@ -131,10 +132,13 @@ directement exploitable, en justifiant chaque choix. Tu écris en français avec
 - ode_steps : null (32) sauf demande.
 - max_duration_seconds : toujours renseigné (≈ cible × 1.4). C'est un garde-fou : le studio borne les tokens sémantiques et
   annule avant la phase coûteuse si la partition planifiée dépasse cette durée de plus de 30 %.
-- Instrumental (pas de texte chanté) : la durée n'est ancrée par rien, le modèle peut dériver pendant des minutes. Mets
-  "Instrumental" en tête du style, limite les paroles à 2 ou 3 balises ([Intro], [Interlude], [Outro]), fixe
-  max_duration_seconds serré (cible × 1.2) et semantic_sampling.max_tokens ≈ cible × 25 × 1.2. Préviens l'utilisateur
-  que la longueur d'un instrumental est moins prévisible et qu'une partition fournie la fixe exactement.
+- Instrumental (morceau sans voix) : mets "instrumental": true et cot "full". Le studio fusionne alors une LoRA
+  instrumentale (expérimentale) dans le modèle et réduit les paroles à leurs balises : écris les paroles comme une simple
+  structure, une balise par ligne en minuscules parmi [intro] [verse] [pre-chorus] [chorus] [bridge] [outro], avec si
+  utile un horodatage « [verse 0:15-0:45] » qui guide les proportions ; ou « [instrumental] » seul pour laisser le modèle
+  choisir. Aucun texte chanté, aucune note de production dans les crochets. Décris le style sans mots de voix. Fixe
+  max_duration_seconds (cible × 1.3) : la durée d'un instrumental est moins prévisible. Préviens l'utilisateur que la
+  voix peut encore apparaître (fonction expérimentale) et que la LoRA est sous licence non commerciale (CC BY-NC).
 - name : court, sans espaces ni accents.
 
 ## Paramètres du runtime (bornes, défauts, explications)
@@ -244,6 +248,11 @@ def normalize_proposal(raw: dict) -> tuple[dict, list[str]]:
         if prop.get("cot"):
             warnings.append(f"mode cot inconnu « {prop.get('cot')} », remplacé par full")
         prop["cot"] = "full"
+    instrumental = prop.get("instrumental")
+    prop["instrumental"] = instrumental is True or str(instrumental).strip().lower() in {"true", "1", "yes", "oui"}
+    if prop["instrumental"] and prop["cot"] != "full":
+        warnings.append(f"instrumental : mode {prop['cot']} remplacé par full (exigé par la LoRA)")
+        prop["cot"] = "full"
     cfg = prop.get("cfg_scale")
     prop["cfg_scale"] = None if cfg in (None, "", "null", "auto") else _num(cfg, "float", 0, 20)
     prop["seed"] = _num(prop.get("seed"), "int", 0, 2**31 - 1)
@@ -274,8 +283,11 @@ def normalize_proposal(raw: dict) -> tuple[dict, list[str]]:
     if max_d is None and target:
         max_d = min(3600, int(round(target * 1.4)))
     prop["max_duration_seconds"] = max_d
-    if sung_lines(prop["lyrics"]) == 0 and prop["lyrics"]:
-        warnings.append("aucune ligne chantée : durée non ancrée par les paroles, la durée maximale fera office de borne")
+    if prop["instrumental"]:
+        warnings.append("instrumental (expérimental) : LoRA appliquée, paroles réduites aux balises de section ; la voix peut encore apparaître")
+    elif sung_lines(prop["lyrics"]) == 0 and prop["lyrics"]:
+        warnings.append("aucune ligne chantée : durée non ancrée par les paroles, la durée maximale fera office de borne ; "
+                        "pour un vrai instrumental, cochez « Instrumental »")
     if target and abs(est["seconds"] - target) > max(20, 0.25 * target):
         warnings.append(f"durée estimée {est['seconds']:.0f} s pour une cible de {target} s : ajustez le nombre de lignes")
     rationale = prop.get("rationale")
@@ -310,6 +322,7 @@ def proposal_to_form(prop: dict, project: Project | None = None) -> dict:
         values["seed"] = project.seed
     if prop.get("ode_steps"):
         values["ode_steps"] = prop["ode_steps"]
+    values["instrumental"] = bool(prop.get("instrumental"))
     if prop.get("max_duration_seconds"):
         values["max_duration"] = prop["max_duration_seconds"]
     for prefix in ("semantic", "abc"):

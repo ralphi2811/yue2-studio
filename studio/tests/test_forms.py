@@ -142,6 +142,19 @@ def test_parse_job_form_plan_overflow():
     assert A._row_to_form({"plan_overflow": "stop"}, {})["plan_overflow"] == "stop"
 
 
+def test_parse_job_form_instrumental_rewrites_lyrics_and_requires_full():
+    job = A.parse_job_form(dict(BASE, instrumental="1", cot="full", lyrics="[Intro]\nla la\n[Chorus]\nsing\n[Outro]"))
+    assert job.instrumental is True and job.request["lyrics"] == "[intro]\n[chorus]\n[outro]"
+    assert A.parse_job_form(dict(BASE, instrumental="1", cot="full", lyrics="")).request["lyrics"] == "[instrumental]"
+    with pytest.raises(A.FormError, match="full"):
+        A.parse_job_form(dict(BASE, instrumental="1", cot="melody"))
+    with pytest.raises(A.FormError, match="obligatoires"):
+        A.parse_job_form(dict(BASE, lyrics=""))                     # sans la case, les paroles restent obligatoires
+    assert A.parse_job_form(dict(BASE)).instrumental is False
+    assert A._row_to_form({"instrumental": True}, {})["instrumental"] == "True"
+    assert A.job_to_form(job, "reuse")["instrumental"] is True
+
+
 def test_parse_job_form_keeps_source_job_for_lineage():
     assert A.parse_job_form(dict(BASE)).source_job is None
     assert A.parse_job_form(dict(BASE, source_job=" abc-123 ")).source_job == "abc-123"

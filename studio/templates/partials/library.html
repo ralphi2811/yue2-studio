@@ -14,7 +14,7 @@
       <div class="track-main">
         <span class="track-name">{{ job.name }}</span>
         <span class="track-meta muted">
-          {{ m.kind_label(job) }} · {{ job.request.cot }} · seed {{ job.request.seed }}
+          {{ m.kind_label(job) }}{% if job.instrumental %} · <span class="accent">instrumental</span>{% endif %} · {{ job.request.cot }} · seed {{ job.request.seed }}
           {% if job.summary.audio_seconds %} · {{ job.summary.audio_seconds|duration }}{% endif %}
           {% if job.summary.truncated and (job.summary.truncated.abc or job.summary.truncated.semantic) %} · <span class="warn">tronqué</span>{% endif %}
         </span>

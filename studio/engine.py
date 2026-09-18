@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from .paths import ROOT, OUTPUT_ROOT, DATA_DIR
+from . import lora
 from . import guard
 
 SETTINGS_FILE = DATA_DIR / "settings.json"
@@ -37,6 +38,8 @@ STAGE_LABELS_FR = {
     "Synthesizing audio": "Synthèse acoustique (flow matching)",
     "Loading audio decoder": "Chargement du décodeur VAE",
     "Decoding audio": "Décodage audio",
+    "Applying instrumental LoRA": "Application de la LoRA instrumentale",
+    "Reloading base model": "Retour au modèle de base (sans LoRA)",
 }
 
 
@@ -58,6 +61,10 @@ class EngineSettings:
     vae_core_frames: str = "auto"
     offline: bool = False
     verify_hashes: bool = True
+    # LoRA instrumentale (expérimental) : appliquée à la demande, job par job, sans recharger le pipeline.
+    instrumental_lora: str = "Mothersuperior/YuE2-instrumental-cot-full-loras"
+    instrumental_lora_file: str = "ar_lora_inst_v3abc.bf16.safetensors"
+    instrumental_lora_scale: float = 1.0
 
     @property
     def vae_repo(self) -> str:
@@ -156,6 +163,7 @@ class Job:
     version: int | None = None
     max_seconds: int | None = None              # durée maximale demandée (garde-fou), None = aucune
     plan_overflow: str = "auto"                 # partition trop longue : auto | trim | stop (voir guard.should_trim)
+    instrumental: bool = False                  # LoRA instrumentale appliquée au modèle AR (expérimental)
     seq: int = 0                                # ordre d'arrivée dans la session (départage des créations dans la même seconde)
 
     @property
@@ -423,7 +431,8 @@ class Engine:
     def _ensure_pipeline(self):
         with self.lock:
             wanted = dataclasses.replace(self.settings)
-            fresh = self.pipe is not None and self.loaded_settings == wanted
+            fresh = self.pipe is not None and self.loaded_settings is not None and \
+                self.loaded_settings.pipeline_kwargs() == wanted.pipeline_kwargs()
         if fresh:
             return self.pipe
         self._close_pipeline()
@@ -549,6 +558,54 @@ class Engine:
                 self._bump()
         return on_token
 
+    # ---- LoRA instrumentale (expérimental) ------------------------------
+    def _lora_wanted(self, job: Job):
+        if not job.instrumental:
+            return None
+        s = self.settings
+        return ((s.instrumental_lora or "").strip(), (s.instrumental_lora_file or "").strip(), float(s.instrumental_lora_scale or 1.0))
+
+    def _ensure_lora(self, pipe, job: Job) -> dict | None:
+        """Met le modèle AR dans l'état voulu par le job : LoRA fusionnée pour un instrumental, poids d'origine sinon.
+
+        La fusion modifie les poids en place ; revenir au modèle de base passe par un rechargement des poids
+        depuis le cache (≈ 10 s), ce qui garantit l'exactitude (pas de dérive bf16 à force d'ajouter puis soustraire).
+        """
+        wanted = self._lora_wanted(job)
+        current = getattr(pipe, "_studio_lora", None)
+        if current == wanted:
+            return getattr(pipe, "_studio_lora_info", None) if wanted else None
+        if current is not None:
+            with pipe._status("Reloading base model"):
+                pipe._model = None
+                pipe._studio_lora, pipe._studio_lora_info = None, None
+                self._free_gpu()
+                if wanted is None:
+                    pipe._load_model()
+        if wanted is None:
+            return None
+        if getattr(pipe, "backend", "torch") == "vllm":
+            raise lora.LoRAError("La LoRA instrumentale n'est pas disponible avec le backend vllm : choisissez torch ou torch-eager.")
+        repo, filename, scale = wanted
+        with pipe._status("Applying instrumental LoRA"):
+            path = lora.resolve_file(repo, filename, offline=self.settings.offline)
+            tensors = lora.load_tensors(path)
+            model = pipe._load_model()
+            merged = lora.merge(model, tensors, scale)
+        info = {"repo": repo, "file": filename, "scale": scale, "merged_linears": merged, **lora.describe(tensors)}
+        pipe._studio_lora, pipe._studio_lora_info = wanted, info
+        return info
+
+    @staticmethod
+    def _free_gpu():
+        try:
+            import gc, torch
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except Exception:
+            pass
+
     def _run_song(self, pipe, job: Job):
         """Même séquence que ``YuE2Pipeline.__call__`` avec, entre la planification et la phase sémantique,
         un contrôle de la durée planifiée et une borne automatique des tokens sémantiques."""
@@ -556,6 +613,7 @@ class Engine:
         from yue2.pipeline import SongResult
         from yue2.storage import identity
         self._configure(pipe, job)
+        lora_info = self._ensure_lora(pipe, job)
         cancelled = lambda: job.cancel_requested
         request = pipe._request(**job.request)
         start = _time.perf_counter()
@@ -601,6 +659,7 @@ class Engine:
                        "timing": receipt["timing"], "has_audio": True, "has_score": result.abc is not None,
                        "identity": receipt["identity"], "vae": job.engine.get("vae", "standard"),
                        "planned": planned, "guard": cap_info, "trim": trim_info, "trim_note": guard.trim_note(trim_info),
+                       "lora": lora_info,
                        "truncation_note": guard.truncation_note(receipt["truncated"].get("semantic", False), cap_info)}
 
     @staticmethod
@@ -614,13 +673,14 @@ class Engine:
 
     def _run_plan(self, pipe, job: Job):
         self._configure(pipe, job)
+        lora_info = self._ensure_lora(pipe, job)
         request = {k: v for k, v in job.request.items()}
         plan = pipe.plan(**request, abc_sampling=job.abc_sampling or None, cancelled=lambda: job.cancel_requested,
                          on_token=self._abc_streamer(pipe, job))
         plan.save(job.output_dir)
         job.live_abc = plan.abc or ""
         job.summary = {"truncated": {"abc": plan.truncated}, "timing": {"abc": plan.timing},
-                       "has_audio": False, "has_score": plan.abc is not None}
+                       "has_audio": False, "has_score": plan.abc is not None, "lora": lora_info}
 
     def _run_decode(self, pipe, job: Job):
         import numpy as np

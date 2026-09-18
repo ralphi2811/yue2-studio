@@ -24,6 +24,7 @@ from fastapi.templating import Jinja2Templates
 from . import abctools
 from . import assistant as A
 from . import llm
+from . import lora
 from . import params as P
 from . import projects as PR
 from .engine import EngineSettings, Job, get_engine, slugify
@@ -143,9 +144,16 @@ def parse_job_form(form) -> Job:
     kind = form.get("kind", "song")
     if kind not in {"song", "plan"}:
         raise FormError("Type de job inconnu.")
-    if not values["style"] or not values["lyrics"].strip():
+    instrumental = bool(values.get("instrumental"))
+    if not values["style"] or (not values["lyrics"].strip() and not instrumental):
         raise FormError("Le style et les paroles sont obligatoires.")
     cot = values["cot"]
+    if instrumental:
+        if cot != "full":
+            raise FormError("Le mode instrumental (LoRA) exige le mode de composition « full » : le modèle écrit d'abord sa partition.")
+        if kind == "plan":
+            pass   # planifier seulement reste possible : la LoRA écrit la partition instrumentale
+        values["lyrics"] = lora.instrumental_lyrics(values["lyrics"])
     if values["abc"] and cot == "off":
         raise FormError("Une partition fournie exige le mode full ou melody.")
     if kind == "plan" and (cot == "off" or values["abc"]):
@@ -185,7 +193,7 @@ def parse_job_form(form) -> Job:
     return Job(id=engine.new_job_id(name), name=name, kind=kind, request=request,
                abc_sampling=abc_s, semantic_sampling=sem_s, ode_steps=int(values["ode_steps"]), project_id=project_id,
                max_seconds=int(values["max_duration"]) if values.get("max_duration") is not None else None,
-               plan_overflow=values.get("plan_overflow") or "auto",
+               plan_overflow=values.get("plan_overflow") or "auto", instrumental=instrumental,
                source_job=(form.get("source_job") or "").strip() or None)
 
 
@@ -208,7 +216,7 @@ def job_to_form(job: Job, mode: str) -> dict[str, Any]:
     values.update(name=job.name, style=r.get("style", ""), lyrics=r.get("lyrics", ""), cot=r.get("cot", "full"),
                   seed=r.get("seed", 831001), cfg_scale=r.get("cfg_scale"), abc=r.get("abc") or "",
                   ode_steps=job.ode_steps, project_id=job.project_id or "", max_duration=job.max_seconds,
-                  plan_overflow=job.plan_overflow or "auto")
+                  plan_overflow=job.plan_overflow or "auto", instrumental=bool(job.instrumental))
     for prefix, sampling in (("abc", job.abc_sampling), ("semantic", job.semantic_sampling)):
         for k, v in (sampling or {}).items():
             values[f"{prefix}.{k}"] = v
@@ -602,7 +610,7 @@ async def events(request: Request):
 # Import par lot (JSONL / JSON / CSV)
 # --------------------------------------------------------------------------
 _ROW_KEYS = {"name", "id", "style", "tags", "lyrics", "cot", "seed", "cfg_scale", "abc", "ode_steps", "kind",
-             "abc_sampling", "semantic_sampling", "max_duration", "plan_overflow"}
+             "abc_sampling", "semantic_sampling", "max_duration", "plan_overflow", "instrumental"}
 
 
 def _rows_from_upload(data: bytes, filename: str) -> list[dict]:
@@ -635,7 +643,7 @@ def _row_to_form(row: dict, defaults: dict) -> dict[str, str]:
         raise FormError(f"Champs inconnus : {sorted(unknown)}")
     out = dict(defaults)
     out["name"] = str(row.get("name") or row.get("id") or defaults.get("name") or "song")
-    for key in ("style", "lyrics", "cot", "seed", "cfg_scale", "abc", "ode_steps", "kind", "max_duration", "plan_overflow"):
+    for key in ("style", "lyrics", "cot", "seed", "cfg_scale", "abc", "ode_steps", "kind", "max_duration", "plan_overflow", "instrumental"):
         src = "tags" if key == "style" and "style" not in row and "tags" in row else key
         if src in row and row[src] is not None:
             out[key] = str(row[src])

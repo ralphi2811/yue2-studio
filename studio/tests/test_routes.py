@@ -140,6 +140,22 @@ def test_compare_candidates_are_limited_to_related_tracks(client, make_job, stor
     assert client.get(f"/jobs/{stranger.id}").text.count("compare-row") == 0   # rien de comparable
 
 
+def test_instrumental_option_in_form_settings_and_detail(client, engine, fake_runner):
+    page = client.get("/studio").text
+    assert 'name="instrumental"' in page and 'id="instrumental-note"' in page
+    settings = client.get("/partials/settings").text
+    assert 'name="instrumental_lora"' in settings and 'name="instrumental_lora_scale"' in settings
+    r = client.post("/jobs", data=dict(BASE, name="instru_route", instrumental="1", cot="full", lyrics="[Intro]\nwords\n[Chorus]"))
+    assert r.status_code == 200
+    job = wait_done(engine, next(j.id for j in engine.jobs.values() if j.name == "instru_route"))
+    assert job.instrumental is True and job.request["lyrics"] == "[intro]\n[chorus]"
+    detail = client.get(f"/jobs/{job.id}").text
+    assert "LoRA instrumentale" in detail and "instrumental" in client.get("/partials/library").text
+    assert client.post("/jobs", data=dict(BASE, instrumental="1", cot="melody")).status_code == 422
+    # la case est conservée dans le formulaire rechargé depuis le job
+    assert 'name="instrumental" value="1" checked' in client.get(f"/partials/form?from_job={job.id}").text
+
+
 def test_form_origin_labels():
     from studio.app import form_origin
 

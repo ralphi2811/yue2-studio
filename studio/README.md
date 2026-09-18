@@ -100,6 +100,26 @@ Couverture : catalogue de paramètres, parsing et validation des formulaires, im
 renommage, réglages), projets (persistance, versions, diffs), assistant (normalisation, résumé de projet, tours de conversation,
 actions rapides) et routes HTTP de bout en bout (génération, bibliothèque, outils ABC, assistant, projets).
 
+## Instrumental (expérimental)
+
+YuE2 n'a pas de mode instrumental : entraîné sur des chansons, il ajoute une voix même quand la mélodie vocale de la partition
+planifiée est vide (constat partagé par la communauté, sans réponse des mainteneurs). La case **Instrumental** du formulaire
+fusionne dans le modèle autorégressif une LoRA communautaire de rang 64 entraînée sur ≈ 2 700 morceaux instrumentaux
+([Mothersuperior/YuE2-instrumental-cot-full-loras](https://huggingface.co/Mothersuperior/YuE2-instrumental-cot-full-loras),
+licence **CC BY-NC 4.0**, usage non commercial). Concrètement :
+
+- le mode de composition « full » est imposé (la LoRA écrit d'abord sa partition) ;
+- les paroles sont réduites à leur structure au format de la LoRA : balises nues en minuscules parmi `[intro]`, `[verse]`,
+  `[pre-chorus]`, `[chorus]`, `[bridge]`, `[outro]`, horodatage optionnel `[verse 0:15-0:45]`, ou `[instrumental]` seul.
+  Les autres balises YuE2 sont converties (`[Interlude]` → `[bridge]`, `[Refrain]` → `[chorus]`…), le texte chanté est supprimé ;
+- la fusion (`W += scale · B @ A`, formule du script de référence de l'auteur, sans PEFT) se fait job par job : passer d'une
+  chanson à un instrumental ou l'inverse recharge le modèle depuis le cache (≈ 10 s), ce qui garantit des poids de base exacts ;
+- réglages dans ⚙︎ Moteur → Instrumental : dépôt ou chemin local, nom du fichier, intensité (1.0 = tel qu'entraîné).
+
+Limites : backend `vllm` et quantification FP8 non supportés ; résultat non garanti (la voix peut encore apparaître, l'auteur
+signale des fins précoces) ; l'assistant coche la case quand on lui demande un instrumental. Le module est `lora.py`, testé par
+`tests/test_lora.py` sur un modèle jouet.
+
 ## Déploiement en conteneur
 
 Le dépôt fournit un `Dockerfile` (base officielle PyTorch 2.10 / CUDA 12.8, utilisateur non root) et un `docker-compose.yml`.
@@ -137,6 +157,7 @@ une carte 24 Go ; comptez le téléchargement des modèles au premier démarrage
 | `app.py` | Routes FastAPI : pages, partials HTMX, SSE `/events`, fichiers, conversion WAV, import par lot, outils ABC. |
 | `llm.py` | Connecteur OpenAI-compatible (httpx) : réglages, `/models`, `/chat/completions`, extraction JSON tolérante. |
 | `assistant.py` | Prompt système généré depuis le catalogue, sessions de conversation, normalisation et validation des propositions, actions rapides. |
+| `lora.py` | LoRA instrumentale (expérimental) : résolution du fichier, fusion des deltas dans le modèle AR, réécriture des paroles en structure. |
 | `guard.py` | Garde-fous de durée : durée d'une partition ABC, borne sémantique, contrôle du plan, notes de troncature. |
 | `projects.py` | Projets : persistance JSON, versions, diffs de requêtes et résumés de changements. |
 | `paths.py` | Chemins des sorties et des réglages, surchargeables par `YUE2_STUDIO_OUTPUT` / `YUE2_STUDIO_DATA` (tests). |

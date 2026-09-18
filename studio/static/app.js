@@ -186,9 +186,39 @@
     if (scoreTab) scoreTab.textContent = hasAbc ? "Partition ●" : "Partition";
   }
 
+  // Miroir simplifié de studio/lora.py::instrumental_lyrics, pour prévisualiser la structure envoyée à la LoRA.
+  const LORA_TAGS = ["intro", "verse", "pre-chorus", "chorus", "bridge", "outro"];
+  const LORA_ALIASES = { prechorus: "pre-chorus", "pre chorus": "pre-chorus", refrain: "chorus", hook: "chorus", drop: "chorus",
+    interlude: "bridge", solo: "bridge", break: "bridge", instrumental: "bridge", end: "outro", ending: "outro", coda: "outro", couplet: "verse", pont: "bridge", final: "outro" };
+  function instrumentalPlan(lyrics) {
+    const out = [];
+    for (const line of lyrics.split(/\r?\n/)) {
+      const m = /^\s*\[\s*([^\]]+?)\s*(?:(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2}))?\s*\]\s*$/.exec(line);
+      if (!m) continue;
+      let name = m[1].trim().toLowerCase().replace(/[\s_]+/g, " ").replace(/\s*\d+\s*$/, "");
+      let tag = LORA_TAGS.includes(name) ? name : LORA_ALIASES[name];
+      if (!tag) { const first = name.split(" ")[0]; tag = LORA_TAGS.includes(first) ? first : LORA_ALIASES[first]; }
+      if (!tag) continue;
+      out.push(m[2] && m[3] ? `[${tag} ${m[2]}-${m[3]}]` : `[${tag}]`);
+    }
+    if (out.length && out.every(t => t === "[bridge]") && /instrumental/i.test(lyrics)) return "[instrumental]";
+    return out.length ? out.join("\n") : "[instrumental]";
+  }
+  function updateInstrumentalNote(form) {
+    const box = $('input[name="instrumental"]', form), note = $("#instrumental-note", form);
+    if (!box || !note) return;
+    if (!box.checked) { note.hidden = true; return; }
+    const cot = $('select[name="cot"]', form);
+    if (cot && cot.value !== "full") cot.value = "full";
+    const plan = instrumentalPlan($('textarea[name="lyrics"]', form)?.value || "");
+    note.innerHTML = `<strong>Mode instrumental (LoRA, expérimental).</strong> Mode de composition « full » imposé. Les paroles ne servent que de structure : le modèle recevra <code class="mono">${escapeHtml(plan).replace(/\n/g, " ")}</code>. Un horodatage « [verse 0:15-0:45] » guide les proportions. La voix peut encore apparaître ; licence de la LoRA : CC BY-NC (non commercial).`;
+    note.hidden = false;
+  }
+
   function updateLyricsStats(form) {
     const ta = $('textarea[name="lyrics"]', form);
     const out = $("#lyrics-stats", form);
+    updateInstrumentalNote(form);
     if (!ta || !out) return;
     const lines = ta.value.split(/\r?\n/).filter(l => l.trim());
     const sections = lines.filter(l => /^\s*\[.+\]\s*$/.test(l)).length;
@@ -651,7 +681,10 @@
     if (name === "lyrics" || name === "style") updateLyricsStats(form);
     if (name === "abc") { syncModeRules(form); renderAbcPreview(form); }
     if (name === "semantic.max_tokens" || name === "semantic.min_tokens") updateDurationEstimate(form);
-    if (name === "max_duration" || name === "plan_overflow") updateLyricsStats(form);
+    if (name === "max_duration" || name === "plan_overflow" || name === "instrumental") updateLyricsStats(form);
+    if (name === "cot" && $('input[name="instrumental"]', form)?.checked && ev.target.value !== "full") {
+      ev.target.value = "full"; updateInstrumentalNote(form);
+    }
     if (ev.target.type === "checkbox" && ev.target.closest(".switch")) {
       const lbl = ev.target.closest(".switch").querySelector(".switch-label");
       if (lbl) lbl.textContent = ev.target.checked ? "activé" : "désactivé";
