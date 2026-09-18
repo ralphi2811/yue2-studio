@@ -35,3 +35,7 @@ jobs:
           yue2 doctor
       - name: Run tests without model downloads
         run: python -m pytest -q
+      - name: Run YuE2 Studio tests
+        run: |
+          python -m pip install -r studio/requirements.txt
+          python -m pytest studio/tests -q

@@ -90,6 +90,32 @@ Couverture : catalogue de paramètres, parsing et validation des formulaires, im
 renommage, réglages), projets (persistance, versions, diffs), assistant (normalisation, résumé de projet, tours de conversation,
 actions rapides) et routes HTTP de bout en bout (génération, bibliothèque, outils ABC, assistant, projets).
 
+## Déploiement en conteneur
+
+Le dépôt fournit un `Dockerfile` (base officielle PyTorch 2.10 / CUDA 12.8, utilisateur non root) et un `docker-compose.yml`.
+L'image est publiée sur GHCR à chaque tag `v*` : `ghcr.io/ralphi2811/yue2-studio`.
+
+**Prérequis hôte** : Linux, pilote NVIDIA récent, [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html),
+un GPU avec 24 Go de VRAM (BF16). Les modèles ne sont pas dans l'image : ils se téléchargent depuis Hugging Face au premier
+chargement du moteur (≈ 7,3 Go) dans le volume `models`, puis restent en cache.
+
+```bash
+# image publiée
+YUE2_LLM_API_KEY=sk-... docker compose up -d          # la clé est optionnelle (assistant de composition)
+# ou construction locale
+docker compose up -d --build
+```
+
+Volumes : `models` (cache Hugging Face), `outputs` (morceaux et projets), `data` (réglages du moteur et de l'assistant).
+Variables : `YUE2_STUDIO_PORT` (défaut 8420), `YUE2_LLM_API_KEY`, `HF_TOKEN` (inutile pour les modèles publics).
+
+> **Aucune authentification n'est intégrée.** Le studio est pensé pour un poste local ou un réseau privé : toute personne qui
+> atteint le port peut lancer des générations sur le GPU et consommer la clé LLM. Pour l'exposer, placez une identification en
+> amont : Tailscale, reverse proxy avec authentification (Caddy, nginx, Traefik), Cloudflare Access, etc.
+
+Hébergement : une machine personnelle avec GPU derrière Tailscale, ou un GPU loué à l'heure (RunPod, Vast.ai, Lambda…) avec
+une carte 24 Go ; comptez le téléchargement des modèles au premier démarrage, d'où l'intérêt d'un volume persistant.
+
 ## Architecture
 
 | Fichier | Rôle |

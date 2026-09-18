@@ -1,0 +1,36 @@
+# YuE2 Studio — hébergement conteneurisé sur une machine avec GPU NVIDIA (24 Go de VRAM recommandés).
+# Prérequis hôte : pilote NVIDIA + nvidia-container-toolkit (https://docs.nvidia.com/datacenter/cloud-native/).
+#
+#   YUE2_LLM_API_KEY=sk-... docker compose up -d        # clé optionnelle : assistant de composition
+#   docker compose logs -f studio
+#
+# ⚠ Le studio n'a AUCUNE authentification : il est pensé pour un usage local ou un réseau privé.
+#   Pour l'exposer, placez-le derrière une identification en amont (Tailscale, reverse proxy avec auth,
+#   Cloudflare Access…). Toute personne atteignant le port peut utiliser le GPU et la clé LLM.
+services:
+  studio:
+    image: ghcr.io/ralphi2811/yue2-studio:latest
+    build: .
+    container_name: yue2-studio
+    restart: unless-stopped
+    ports:
+      - "${YUE2_STUDIO_PORT:-8420}:8420"
+    environment:
+      YUE2_LLM_API_KEY: ${YUE2_LLM_API_KEY:-}
+      HF_TOKEN: ${HF_TOKEN:-}                 # inutile pour les modèles publics m-a-p/YuE2-*
+    volumes:
+      - models:/models                        # cache Hugging Face (YuE2-3B ≈ 6,8 Go + VAE ≈ 0,5 Go)
+      - outputs:/outputs                      # morceaux générés et projets
+      - data:/data                            # réglages du moteur et de l'assistant (contient la clé si saisie dans l'UI)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+volumes:
+  models:
+  outputs:
+  data:
