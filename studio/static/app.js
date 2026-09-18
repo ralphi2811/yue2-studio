@@ -321,6 +321,10 @@
   function initForm(root) {
     const form = $("#job-form", root || document);
     if (!form) return;
+    // Le formulaire vient du serveur : il est « propre ». Toute frappe ensuite suspend
+    // l'application automatique des propositions (on n'écrase pas un travail en cours).
+    window.yue2FormDirty = false;
+    form.addEventListener("input", () => { window.yue2FormDirty = true; });
     restoreFormTab(form.parentElement);
     if (form.dataset.openTab) { const b = $(`.tab[data-tab="${form.dataset.openTab}"]`, form); if (b) activateTab(b); }
     syncModeRules(form);
@@ -593,6 +597,7 @@
     if (p) {
       const role = p.dataset.player;
       if (role === "play-card") { const card = p.closest(".card, .version, .recent"); if (gp.card === card && gp.wave) gp.wave.playPause(); else gpLoad(card, true); return; }
+      if (role === "play-track") { const el = p.closest("[data-audio]"); if (el) gpLoad(el, true); return; }
       if (role === "toggle") { gpToggle(); return; }
       if (role === "prev") { gpStep(-1); return; }
       if (role === "next") { gpStep(1); return; }
@@ -749,8 +754,17 @@
       if (id) $$(".track", target).forEach(x => x.classList.toggle("selected", x.dataset.job === id));
     }
     if (target.id === "project") { abInit(target); renderAbcBlocks(target); }
-    if (target.id === "assistant-body") { scrollChat(); const ta = $("textarea", target); if (ta && !ta.disabled && !$("#assistant-drawer").hidden) ta.focus(); }
+    if (target.id === "assistant-body") {
+      scrollChat();
+      restoreAutoRun(target);
+      const ta = $("textarea", target); if (ta && !ta.disabled && !$("#assistant-drawer").hidden) ta.focus();
+    }
+    if (target.id === "form-panel") window.yue2FormDirty = false;
     if (target.id === "gallery") gpRelink(target);
+  });
+  document.addEventListener("htmx:oobAfterSwap", ev => {
+    const target = (ev.detail && ev.detail.target) || ev.target;
+    if (target && target.id === "form-panel") { initForm(target); }
   });
   document.addEventListener("htmx:beforeRequest", ev => {
     if (ev.detail.elt && ev.detail.elt.matches && ev.detail.elt.matches(".composer")) {
@@ -771,7 +785,28 @@
     if (!ev.detail || ev.detail.type !== "library") return;
     const id = $(".detail")?.dataset.job;
     if (id && window.htmx) htmx.ajax("GET", `/jobs/${id}`, { target: "#detail", swap: "innerHTML" });
+    refreshAssistantNotes();
   });
+
+  // La fin d'une génération ajoute une note de résultat (durée réelle, troncature…) dans la conversation
+  // du projet : on recharge le panneau pour l'afficher, sauf si un message est en cours de rédaction.
+  function refreshAssistantNotes() {
+    const panel = $("#assistant-body .assistant");
+    const project = panel && panel.dataset.project;
+    if (!project || !window.htmx) return;
+    const ta = $("#assistant-body textarea");
+    if (ta && ta.value.trim()) return;
+    htmx.ajax("GET", `/assistant/panel?project_id=${encodeURIComponent(project)}`, { target: "#assistant-body", swap: "innerHTML" });
+  }
+
+  function restoreAutoRun(root) {
+    const box = $('[data-role="auto-run"]', root || document);
+    if (!box) return;
+    try { box.checked = localStorage.getItem("yue2.assistant.auto") !== "0"; } catch (_) {}
+    box.addEventListener("change", () => {
+      try { localStorage.setItem("yue2.assistant.auto", box.checked ? "1" : "0"); } catch (_) {}
+    });
+  }
 
   // ------------------------------------------------------------------ démarrage
   document.addEventListener("DOMContentLoaded", () => {

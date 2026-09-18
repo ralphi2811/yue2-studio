@@ -399,16 +399,8 @@ async def partial_settings(request: Request):
 # --------------------------------------------------------------------------
 # Jobs
 # --------------------------------------------------------------------------
-@app.post("/jobs", response_class=HTMLResponse)
-async def create_job(request: Request):
-    form = await request.form()
-    values = {k: form.get(k) for k in P.ALL_PARAMS}
-    for k in ("source_job", "origin_kind", "origin_name"):
-        values[k] = form.get(k)
-    try:
-        job = parse_job_form(form)
-    except FormError as exc:
-        return HTMLResponse(render("partials/form.html", request, values=values, error=str(exc), flash=None), status_code=422)
+def _submit_job(job: Job) -> str:
+    """Rattache le job à son projet (version numérotée), le met en file, et renvoie le message de confirmation."""
     label = "Planification" if job.kind == "plan" else "Génération"
     flash = f"{label} « {job.name} » ajoutée à la file."
     project = A.store().get(job.project_id)
@@ -424,6 +416,20 @@ async def create_job(request: Request):
     else:
         job.project_id = None
     get_engine().submit(job)
+    return flash
+
+
+@app.post("/jobs", response_class=HTMLResponse)
+async def create_job(request: Request):
+    form = await request.form()
+    values = {k: form.get(k) for k in P.ALL_PARAMS}
+    for k in ("source_job", "origin_kind", "origin_name"):
+        values[k] = form.get(k)
+    try:
+        job = parse_job_form(form)
+    except FormError as exc:
+        return HTMLResponse(render("partials/form.html", request, values=values, error=str(exc), flash=None), status_code=422)
+    flash = _submit_job(job)
     values["project_id"] = job.project_id or ""
     return HTMLResponse(render("partials/form.html", request, values=values, error=None, flash=flash),
                         headers={"HX-Trigger": "queue-changed"})
@@ -794,9 +800,25 @@ def _on_composer(request: Request | None) -> bool:
     return urlparse(current).path.rstrip("/") == "/studio"
 
 
-def _assistant_html(request: Request, project: PR.Project | None, context_job: Job | None = None) -> str:
+def _assistant_html(request: Request, project: PR.Project | None, context_job: Job | None = None, auto_done: bool = False) -> str:
     return render("partials/assistant.html", request, project=project, settings=llm.get_settings(), context_job=context_job,
+                  auto_done=auto_done, versions=_version_playback(project),
                   on_composer=_on_composer(request))
+
+
+def _version_playback(project: PR.Project | None) -> dict:
+    """Par numéro de version : de quoi proposer l'écoute dans la conversation (bouton ▶ sur la note de fin)."""
+    if project is None:
+        return {}
+    jobs = get_engine().jobs
+    out = {}
+    for version in project.versions:
+        job = jobs.get(version.job_id)
+        if job is None:
+            continue
+        out[version.number] = {"job": job.id, "name": job.name, "audio": bool(job.summary.get("has_audio")),
+                               "seconds": job.summary.get("audio_seconds")}
+    return out
 
 
 @app.get("/assistant/panel", response_class=HTMLResponse)
@@ -820,15 +842,54 @@ async def assistant_reset(request: Request):
     return HTMLResponse(_assistant_html(request, A.store().create()))
 
 
+def _as_form(values: dict) -> dict[str, str]:
+    """Valeurs de formulaire typées → chaînes, pour repasser par la validation de ``parse_job_form``."""
+    out = {}
+    for key, value in values.items():
+        if value is None or value is False:
+            out[key] = ""
+        elif value is True:
+            out[key] = "1"
+        else:
+            out[key] = str(value)
+    return out
+
+
+def _auto_generate(project: PR.Project) -> tuple[dict, str, str | None]:
+    """Applique la proposition au formulaire ET met la génération en file (mode « appliquer et générer »).
+
+    Renvoie les valeurs du formulaire, le message à afficher, et l'erreur éventuelle (proposition refusée
+    par la validation : le formulaire est quand même rempli, l'utilisateur corrige à la main).
+    """
+    values, flash, _ = _apply_proposal(project)
+    try:
+        job = parse_job_form(_as_form(dict(values, kind="song")))
+    except FormError as exc:
+        return values, flash, f"Génération non lancée : {exc}"
+    flash = _submit_job(job) + " Écoutez-la dès qu'elle est prête, puis dites-moi ce qu'il faut changer."
+    return values, flash, None
+
+
 @app.post("/assistant/message", response_class=HTMLResponse)
 async def assistant_message(request: Request):
+    """Un tour de conversation. Avec ``auto``, une nouvelle proposition est appliquée au formulaire et
+    mise en file directement (le formulaire part en swap « out of band »)."""
     form = await request.form()
     text = (form.get("text") or "").strip()
     project = A.store().get(form.get("project_id")) or A.store().create()
+    before = json.dumps(project.proposal, sort_keys=True, ensure_ascii=False) if project.proposal else None
     if text:
         context = {"style": form.get("style"), "lyrics": form.get("lyrics"), "cot": form.get("cot")}
         await A.step(project, text, context=context, jobs=get_engine().jobs)
-    return HTMLResponse(_assistant_html(request, project))
+    after = json.dumps(project.proposal, sort_keys=True, ensure_ascii=False) if project.proposal else None
+    fresh = after is not None and after != before
+    auto = bool(form.get("auto")) and not form.get("form_dirty") and _on_composer(request)
+    if not (fresh and auto):
+        return HTMLResponse(_assistant_html(request, project))
+    values, flash, error = _auto_generate(project)
+    panel = _assistant_html(request, project, auto_done=True)
+    oob = render("partials/form_oob.html", request, values=values, error=error, flash=flash, open_tab="song")
+    return HTMLResponse(panel + oob, headers={"HX-Trigger": "queue-changed"})
 
 
 @app.post("/assistant/apply", response_class=HTMLResponse)

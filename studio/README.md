@@ -71,7 +71,13 @@ et `YUE2_LLM_MODEL` sans les exporter dans le shell.
   pages, ⏮/⏭ entre les morceaux visibles), le nom ouvre la fiche. En fin de génération, le morceau qui vient d'apparaître
   est chargé tout seul dans la barre, en pause : il ne reste qu'à appuyer sur lecture (jamais pendant une autre écoute).
   L'assistant suit le morceau ouvert : il affiche la conversation de son projet, ou propose d'en faire la v1 d'un projet s'il
-  n'en a pas ; depuis une fiche, sa proposition s'ouvre dans Composer (`/studio?apply=<projet>`). La comparaison de mélodies ne
+  n'en a pas ; depuis une fiche, sa proposition s'ouvre dans Composer (`/studio?apply=<projet>`).
+  **Appliquer et générer** (case cochée par défaut dans le composeur de l'assistant, sur la page Composer) : chaque nouvelle
+  proposition remplit le formulaire (swap « hors bande ») et part en file sans confirmation. Une modification faite à la main
+  dans le formulaire suspend l'automatisme pour ce tour, et une proposition refusée par la validation remplit quand même le
+  formulaire sans rien lancer. À la fin de la génération, la note de résultat (durée réelle, troncature, mesures planifiées)
+  retourne dans la conversation avec un bouton ▶ pour écouter la version sur place ; elle fait partie du contexte envoyé au
+  LLM au tour suivant, sans appel supplémentaire. La comparaison de mélodies ne
   propose que les versions du même projet et les morceaux partageant la partition.
 - **Bibliothèque** : lecteur avec forme d'onde, téléchargement FLAC / WAV, partition rendue en portée + source ABC,
   requête, réglages effectifs (`config.json`), temps par étape, liste des fichiers.

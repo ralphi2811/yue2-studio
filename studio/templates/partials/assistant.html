@@ -41,7 +41,12 @@
     {% endif %}
     {% for turn in (project.turns if project else []) %}
     {% if turn.role == "note" %}
-    <div class="msg note"><span>ⓘ {{ turn.text }}</span></div>
+    {% set v = versions.get(turn.version) if turn.version else none %}
+    <div class="msg note{% if v and v.audio %} with-play{% endif %}"
+         {% if v and v.audio %}data-job="{{ v.job }}" data-name="{{ v.name }}" data-audio="/jobs/{{ v.job }}/file/audio.flac" data-sub="v{{ turn.version }}{% if v.seconds %} · {{ v.seconds|duration }}{% endif %}"{% endif %}>
+      <span>ⓘ {{ turn.text }}</span>
+      {% if v and v.audio %}<button type="button" class="btn ghost tiny" data-player="play-track" title="Écouter la v{{ turn.version }} ici">▶ écouter</button>{% endif %}
+    </div>
     {% else %}
     <div class="msg {{ turn.role }}">
       {% if turn.error %}
@@ -83,11 +88,20 @@
     </div>
     {% endif %}
     {% endfor %}
+    {% if auto_done %}
+    <div class="msg note">ⓘ Proposition appliquée au formulaire et génération lancée. La note de résultat arrivera ici à la fin.</div>
+    {% endif %}
     <div class="msg assistant pending" data-role="pending" hidden><span class="spinner"></span> <span class="muted small">Réflexion en cours…</span></div>
   </div>
 
-  <form class="composer" hx-post="/assistant/message" hx-target="#assistant-body" hx-swap="innerHTML" hx-indicator="[data-role='pending']" hx-include="#job-form [name='style'], #job-form [name='lyrics'], #job-form [name='cot']">
+  <form class="composer" hx-post="/assistant/message" hx-target="#assistant-body" hx-swap="innerHTML" hx-indicator="[data-role='pending']" hx-include="#job-form [name='style'], #job-form [name='lyrics'], #job-form [name='cot']"
+        hx-vals='js:{"form_dirty": window.yue2FormDirty ? "1" : ""}'>
     <input type="hidden" name="project_id" value="{{ project.id if project else '' }}">
+    {% if on_composer %}
+    <label class="auto-run muted small" title="Chaque nouvelle proposition remplit le formulaire et part en génération, sans clic. Une modification faite à la main dans le formulaire suspend l'automatisme pour ce tour.">
+      <input type="checkbox" name="auto" value="1" data-role="auto-run" checked> ⚡ appliquer et générer sans confirmation
+    </label>
+    {% endif %}
     <textarea name="text" rows="2" placeholder="{{ 'Retour d’écoute ou retouche (« refrain plus court », « plus sombre », « 30 s de moins »)…' if project and project.versions else ('Répondez aux questions, ou demandez une retouche…' if project and project.turns else 'Décrivez votre morceau…') }}" {% if not settings.ready %}disabled{% endif %} required></textarea>
     <button type="submit" class="btn primary" {% if not settings.ready %}disabled{% endif %} title="Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne">Envoyer</button>
   </form>

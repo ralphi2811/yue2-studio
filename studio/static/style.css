@@ -384,8 +384,10 @@ body.has-player .drawer { bottom: var(--player-h); }
 .drawer > div { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 body.assistant-open .layout { margin-right: 470px; max-width: none; }
 @media (max-width: 1400px) { body.assistant-open .layout { margin-right: 0; } }
-.assistant { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-.assistant .panel-head { flex-wrap: nowrap; }
+/* Racine du panneau seulement : « .assistant » nu attraperait aussi les messages « .msg.assistant »,
+   qui héritaient alors de height:100% et débordaient par-dessus le message suivant. */
+#assistant-body > .assistant { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+#assistant-body > .assistant > .panel-head { flex-wrap: nowrap; }
 .chat { flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 10px; padding: 4px 2px 8px; min-height: 0; }
 .msg { flex-shrink: 0; max-width: 100%; border-radius: var(--radius); padding: 10px 12px; font-size: 13px; line-height: 1.5; word-break: break-word; }  /* pas de pre-wrap ici : les retours à la ligne du gabarit deviendraient des lignes vides */
 .msg p { margin: 0; white-space: pre-wrap; }
@@ -401,7 +403,9 @@ body.assistant-open .layout { margin-right: 470px; max-width: none; }
 .proposal .why { font-size: 12px; color: var(--fg-muted); border-left: 2px solid var(--accent); padding-left: 8px; margin: 4px 0 0; }
 .proposal pre.lyrics { max-height: 260px; }
 .proposal-warnings { margin: 6px 0; padding-left: 18px; color: var(--warn); font-size: 12px; }
-.composer { display: flex; gap: 8px; align-items: flex-end; padding-top: 10px; border-top: 1px solid var(--line); }
+.composer { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid var(--line); }
+.auto-run { flex-basis: 100%; display: flex; gap: 6px; align-items: center; cursor: pointer; }
+.auto-run input { margin: 0; }
 .composer textarea { flex: 1; resize: none; font-family: var(--font); font-size: 13px; }
 .chip.accent { border-color: rgba(240,180,41,.5); color: var(--accent); }
 .chip.accent:hover { background: var(--accent-soft); }
@@ -432,6 +436,7 @@ body.assistant-open .layout { margin-right: 470px; max-width: none; }
 .accent { color: var(--accent); }
 .assistant-context { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 13px; }
 .msg.note { align-self: center; background: transparent; border: 1px dashed var(--line); color: var(--fg-muted); font-size: 12px; padding: 6px 10px; }
+.msg.note.with-play { display: flex; gap: 8px; align-items: center; }
 .cover-versions { left: 8px; right: auto; bottom: auto; top: 8px; background: rgba(240,180,41,.9); color: #1a1300; font-weight: 600; }
 .card.is-project { border-color: rgba(240,180,41,.35); }
 .breadcrumb { margin: 0; font-size: 13px; }

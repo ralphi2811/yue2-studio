@@ -163,6 +163,14 @@ def test_player_bar_reserves_its_height():
     assert "padding-bottom: calc(var(--player-h)" in css
     assert "body.has-player .drawer { bottom: var(--player-h); }" in css
 
+
+def test_assistant_panel_css_does_not_leak_into_messages():
+    """« .assistant » nu viserait aussi les messages « .msg.assistant » : ils héritaient de height:100%
+    et débordaient par-dessus la suite de la conversation."""
+    css = (Path(__file__).resolve().parents[1] / "static" / "style.css").read_text()
+    assert "\n.assistant {" not in css
+    assert "#assistant-body > .assistant { display: flex;" in css
+
 SCORE = "X:1\nM:4/4\nQ:1/4=90\nK:C\nV: Vocal\nC4|D4|E4|F4|\n"
 
 
@@ -392,6 +400,69 @@ def test_assistant_flow_creates_project_and_versions(client, engine, fake_runner
     r = client.delete(f"/projects/{project.id}")
     assert r.status_code == 204 and r.headers["HX-Redirect"] == "/"
     assert store.get(project.id) is None and job1.id in engine.jobs and job2.id in engine.jobs
+
+
+def test_assistant_applies_and_generates_by_itself(client, engine, fake_runner, fake_llm, store, monkeypatch):
+    """Mode « appliquer et générer » : chaque nouvelle proposition remplit le formulaire (swap hors bande),
+    part en génération, et son résultat revient dans la conversation avec de quoi l'écouter."""
+    monkeypatch.setattr(A, "_STORE", store)
+    seq = {"n": 0}
+
+    async def chat(messages, **kw):
+        seq["n"] += 1
+        return json.dumps({"type": "proposal", "message": "ok", "proposal": {
+            "name": f"auto_{seq['n']}", "style": "French, indie pop, 84 BPM",
+            "lyrics": "[Verse]\nun\ndeux\n\n[Chorus]\ntrois\nquatre", "cot": "full",
+            "cfg_scale": None, "seed": None, "target_duration_seconds": 40}}, ensure_ascii=False), {"prompt_tokens": 1, "completion_tokens": 1}
+
+    monkeypatch.setattr(llm, "chat", chat)
+    composer = {"HX-Current-URL": "http://x/studio"}
+
+    # sans la case cochée : rien n'est lancé, le bouton d'application reste
+    r = client.post("/assistant/message", data={"project_id": "", "text": "Une chanson"}, headers=composer)
+    project = store.all()[0]
+    assert "Appliquer au formulaire" in r.text and "hx-swap-oob" not in r.text
+    assert not [j for j in engine.jobs.values() if j.project_id == project.id]
+
+    # avec la case cochée : formulaire rempli + génération en file, en un seul aller-retour
+    r = client.post("/assistant/message", data={"project_id": project.id, "text": "vas-y", "auto": "1"}, headers=composer)
+    assert r.status_code == 200 and r.headers.get("HX-Trigger") == "queue-changed"
+    assert 'id="form-panel" hx-swap-oob="innerHTML"' in r.text and "génération lancée" in r.text
+    job = next(j for j in engine.jobs.values() if j.project_id == project.id)
+    assert job.name == "auto_2" and job.version == 1 and job.request["style"].startswith("French")
+    job = wait_done(engine, job.id)
+    assert store.get(project.id).versions[0].source == "assistant"
+
+    # le résultat revient dans la conversation, écoutable sur place
+    panel = client.get(f"/assistant/panel?project_id={project.id}", headers=composer).text
+    assert "v1 générée" in panel and 'data-player="play-track"' in panel
+    assert f'data-audio="/jobs/{job.id}/file/audio.flac"' in panel
+
+    # formulaire modifié à la main : on n'écrase pas, rien n'est lancé
+    count = len(engine.jobs)
+    r = client.post("/assistant/message", data={"project_id": project.id, "text": "plus court", "auto": "1", "form_dirty": "1"}, headers=composer)
+    assert "hx-swap-oob" not in r.text and "Appliquer au formulaire" in r.text and len(engine.jobs) == count
+
+    # hors Composer (aucun formulaire à remplir) : lien vers Composer, rien n'est lancé
+    r = client.post("/assistant/message", data={"project_id": project.id, "text": "encore", "auto": "1"},
+                    headers={"HX-Current-URL": "http://x/morceaux/abc"})
+    assert "hx-swap-oob" not in r.text and f'href="/studio?apply={project.id}"' in r.text and len(engine.jobs) == count
+
+
+def test_assistant_auto_keeps_the_form_when_the_proposal_is_refused(client, engine, fake_runner, fake_llm, store, monkeypatch):
+    """Une proposition que la validation refuse remplit quand même le formulaire, sans rien mettre en file."""
+    monkeypatch.setattr(A, "_STORE", store)
+
+    async def chat(messages, **kw):
+        return json.dumps({"type": "proposal", "message": "ok", "proposal": {
+            "name": "vide", "style": "", "lyrics": "", "cot": "full",
+            "cfg_scale": None, "seed": None, "target_duration_seconds": 40}}, ensure_ascii=False), {"prompt_tokens": 1, "completion_tokens": 1}
+
+    monkeypatch.setattr(llm, "chat", chat)
+    count = len(engine.jobs)
+    r = client.post("/assistant/message", data={"project_id": "", "text": "Une chanson", "auto": "1"},
+                    headers={"HX-Current-URL": "http://x/studio"})
+    assert r.status_code == 200 and "Génération non lancée" in r.text and len(engine.jobs) == count
 
 
 def test_project_from_job_and_delete_with_jobs(client, engine, make_job, fake_llm, store, monkeypatch):

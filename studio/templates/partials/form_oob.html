@@ -1,0 +1,5 @@
+{# Formulaire renvoyé « hors bande » avec la réponse de l'assistant : il remplace le panneau de gauche
+   sans que la conversation ait à le cibler (mode « appliquer et générer »). #}
+<section class="panel panel-form" id="form-panel" hx-swap-oob="innerHTML">
+  {% include "partials/form.html" %}
+</section>
