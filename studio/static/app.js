@@ -492,6 +492,20 @@
     const next = cards[(index + delta + cards.length) % cards.length];
     gpLoad(next, true);
   }
+  // Fin de génération : le morceau qui vient d'apparaître en tête de « Derniers terminés » est chargé
+  // dans la barre de lecture (en pause) pour pouvoir l'écouter sans quitter le Composer.
+  let lastFinished;
+  function gpWatchFinished(initial) {
+    const el = $('[data-role="recent-list"] .recent[data-audio]');
+    const id = el ? el.dataset.job : null;
+    if (initial || id === lastFinished) { lastFinished = id; return; }
+    lastFinished = id;
+    if (!el || el.offsetParent === null) return;          // liste masquée (page Morceaux) : la galerie suffit
+    if (gp.wave && gp.wave.isPlaying()) return;           // ne pas couper une écoute en cours
+    gpLoad(el, false);
+    el.classList.add("fresh");
+  }
+
   // Un swap HTMX remplace le noeud du morceau en lecture : on le retrouve par son id pour garder le surlignage.
   function gpRelink(root) {
     if (!gp.card) return;
@@ -728,6 +742,7 @@
       const live = $('[data-role="live-abc"]', target);
       if (live) live.scrollTop = live.scrollHeight;
       gpRelink(target);
+      gpWatchFinished(false);
     }
     if (target.id === "library") {
       const id = $(".detail")?.dataset.job;
@@ -763,6 +778,7 @@
     try { if (localStorage.getItem("yue2.help") === "1") { $("#toggle-help").checked = true; } } catch (_) {}
     applyGlobalHelp();
     initForm(document);
+    gpWatchFinished(true);
     try { if (localStorage.getItem("yue2.assistant") === "1") setAssistantOpen(true); } catch (_) {}
     abInit(document);
     const pm = /#project=([A-Za-z0-9_.-]+)/.exec(location.hash);

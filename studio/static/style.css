@@ -99,6 +99,7 @@ code { font-family: var(--mono); font-size: 12px; background: var(--bg-elev-2); 
 .queue-recent li { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; }
 .queue-recent li .play { padding: 2px 7px; line-height: 1; }
 .queue-recent li.playing > a, .queue-recent li.playing .play { color: var(--accent); }
+.queue-recent li.fresh { animation: pulse 1.2s ease-in-out 2; }
 .page-landing .queue-recent { display: none; }
 .eyebrow-link { font-size: 12px; color: var(--fg-muted); }
 .eyebrow-link:hover { color: var(--fg); }

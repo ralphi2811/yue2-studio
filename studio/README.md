@@ -68,7 +68,8 @@ et `YUE2_LLM_MODEL` sans les exporter dans le shell.
   « Réutiliser », « Variation » et « Éditer la partition » ouvrent Composer pré-rempli (`/studio?from_job=<id>&mode=…`) et le
   titre du formulaire indique l'origine des valeurs (« Nouvelle version de… », « Variation de… », etc.). La file d'attente de
   Composer liste les derniers morceaux terminés : le ▶ lance la lecture sur place (barre de lecture commune à toutes les
-  pages, ⏮/⏭ entre les morceaux visibles), le nom ouvre la fiche.
+  pages, ⏮/⏭ entre les morceaux visibles), le nom ouvre la fiche. En fin de génération, le morceau qui vient d'apparaître
+  est chargé tout seul dans la barre, en pause : il ne reste qu'à appuyer sur lecture (jamais pendant une autre écoute).
   L'assistant suit le morceau ouvert : il affiche la conversation de son projet, ou propose d'en faire la v1 d'un projet s'il
   n'en a pas ; depuis une fiche, sa proposition s'ouvre dans Composer (`/studio?apply=<projet>`). La comparaison de mélodies ne
   propose que les versions du même projet et les morceaux partageant la partition.

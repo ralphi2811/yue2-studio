@@ -144,6 +144,11 @@ def test_finished_track_is_playable_without_leaving_composer(client, engine, fak
     assert f'<li class="recent" data-job="{job.id}"' in queue and f'data-name="{job.name}"' in queue
     assert f'data-audio="/jobs/{job.id}/file/audio.flac"' in queue and 'data-player="play-card"' in queue
     assert f'href="/morceaux/{job.id}"' in queue                     # le nom reste un lien vers la fiche
+    # la liste est repérée pour le JS, et le morceau le plus récent est en tête : c'est lui que le
+    # lecteur charge tout seul quand la file se rafraîchit en fin de génération
+    assert '<ul data-role="recent-list">' in queue
+    first = queue.split('data-role="recent-list"', 1)[1].split('<li class="recent"')[1]
+    assert f'data-job="{job.id}"' in first     # le plus récent en tête : c'est celui que le lecteur charge
     # le lecteur global n'est plus réservé à la galerie : il est dans le gabarit commun
     for url in ("/studio", "/", f"/morceaux/{job.id}", "/"):
         assert 'id="global-player"' in client.get(url).text

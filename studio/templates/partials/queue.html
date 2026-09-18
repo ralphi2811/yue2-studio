@@ -63,7 +63,7 @@
   {% if recent %}
   <div class="queue-recent">
     <div class="muted small">Derniers terminés</div>
-    <ul>
+    <ul data-role="recent-list">
       {% for job in recent[:4] %}
       {% set sub = m.kind_label(job) ~ (" · " ~ job.summary.audio_seconds|duration if job.summary.audio_seconds else "") %}
       <li class="recent" data-job="{{ job.id }}" data-name="{{ job.name }}" data-sub="{{ sub }}"
