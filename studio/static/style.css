@@ -360,10 +360,11 @@ form.rename input { padding: 5px 8px; font-size: 13px; }
   border-top: 1px solid var(--line-strong); box-shadow: 0 -10px 30px rgba(0,0,0,.25);
 }
 .global-player[hidden] { display: none; }
-/* Le lecteur est fixé en bas : on libère la place pour ne rien masquer. */
-body.has-player { padding-bottom: 76px; }
+/* Le lecteur est fixé en bas : tout ce qui est fixe ou collant lui laisse la place (--player-h). */
+body.has-player { --player-h: 61px; padding-bottom: calc(var(--player-h) + 15px); }
 body.has-player .layout-compose .panel-queue,
-body.has-player .layout-browse .panel-library { max-height: calc(100vh - 156px); }
+body.has-player .layout-browse .panel-library { max-height: calc(100vh - 84px - var(--player-h)); }
+body.has-player .drawer { bottom: var(--player-h); }
 .gp-meta { display: flex; flex-direction: column; min-width: 160px; max-width: 260px; }
 .gp-meta strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gp-wave { flex: 1; min-width: 120px; }

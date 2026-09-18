@@ -1,6 +1,7 @@
 """Routes HTTP de bout en bout, avec un exécuteur de jobs simulé (pas de GPU) et un LLM simulé."""
 import json
 import time
+from pathlib import Path
 
 import pytest
 
@@ -152,6 +153,15 @@ def test_finished_track_is_playable_without_leaving_composer(client, engine, fak
     # le lecteur global n'est plus réservé à la galerie : il est dans le gabarit commun
     for url in ("/studio", "/", f"/morceaux/{job.id}", "/"):
         assert 'id="global-player"' in client.get(url).text
+
+
+def test_player_bar_reserves_its_height():
+    """Le lecteur est fixé en bas : la page et le tiroir de l'assistant lui laissent sa hauteur,
+    sinon il recouvre la zone de saisie de l'assistant."""
+    css = (Path(__file__).resolve().parents[1] / "static" / "style.css").read_text()
+    assert "body.has-player { --player-h:" in css
+    assert "padding-bottom: calc(var(--player-h)" in css
+    assert "body.has-player .drawer { bottom: var(--player-h); }" in css
 
 SCORE = "X:1\nM:4/4\nQ:1/4=90\nK:C\nV: Vocal\nC4|D4|E4|F4|\n"
 
